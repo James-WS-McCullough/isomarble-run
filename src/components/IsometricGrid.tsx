@@ -30,6 +30,9 @@ interface IsometricGridProps {
     position: GridPosition;
     spritePath: string;
   };
+  previewMarble?: {
+    position: GridPosition;
+  };
   onGridClick?: (gridPos: GridPosition) => void;
   onGridHover?: (gridPos: GridPosition) => void;
   onGridMouseDown?: () => void;
@@ -50,6 +53,7 @@ export const IsometricGrid: React.FC<IsometricGridProps> = ({
   sprites = [],
   marbles = [],
   previewSprite,
+  previewMarble,
   onGridClick,
   onGridHover,
   onGridMouseDown,
@@ -190,6 +194,16 @@ export const IsometricGrid: React.FC<IsometricGridProps> = ({
             gridPosition={previewSprite.position}
             spritePath={previewSprite.spritePath}
             config={config}
+            className="opacity-50"
+          />
+        )}
+
+        {/* Preview marble */}
+        {previewMarble && (
+          <Marble
+            position={gridToScreenPosition(previewMarble.position)}
+            rotation={0}
+            state="falling"
             className="opacity-50"
           />
         )}

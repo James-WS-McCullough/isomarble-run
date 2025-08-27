@@ -12,6 +12,7 @@ interface MarbleProps {
   rotation?: number;
   state?: "rolling" | "falling" | "behind";
   behindCoordinates?: { x: number; y: number };
+  className?: string;
 }
 
 /**
@@ -22,6 +23,7 @@ export const Marble: React.FC<MarbleProps> = ({
   rotation = 0,
   state = "falling",
   behindCoordinates,
+  className = "",
 }) => {
   // Use screen coordinates directly for positioning - no grid conversion needed
   const finalScreenPos = {
@@ -64,7 +66,7 @@ export const Marble: React.FC<MarbleProps> = ({
       <img
         src="/sprites/marble/MarbleBase.png"
         alt="Marble base"
-        className="absolute pointer-events-none"
+        className={`absolute pointer-events-none ${className}`}
         style={{
           left: `${finalScreenPos.x - marbleSize / 2}px`,
           top: `${finalScreenPos.y - marbleSize / 2}px`,
@@ -84,7 +86,7 @@ export const Marble: React.FC<MarbleProps> = ({
       <img
         src="/sprites/marble/MarbleHilight.png"
         alt="Marble highlight"
-        className="absolute pointer-events-none"
+        className={`absolute pointer-events-none ${className}`}
         style={{
           left: `${finalScreenPos.x - marbleSize / 2}px`,
           top: `${finalScreenPos.y - marbleSize / 2}px`,
