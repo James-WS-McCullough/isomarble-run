@@ -338,6 +338,7 @@ export default function Home() {
               width={800}
               height={600}
               sprites={sprites}
+              marbles={marbles}
               previewSprite={
                 previewPosition && !isPlacingMarble
                   ? {
@@ -355,25 +356,6 @@ export default function Home() {
               showGrid={true}
               className="bg-gray-800"
             />
-
-            {/* Render marbles on top of the grid */}
-            <div className="absolute inset-0 pointer-events-none">
-              <div
-                className="absolute"
-                style={{
-                  left: `${800 / 2}px`,
-                  top: `${600 / 2}px`,
-                }}
-              >
-                {marbles.map((marble) => (
-                  <Marble
-                    key={marble.id}
-                    position={gridToScreenPosition(marble.gridPosition)}
-                    rotation={marble.rotation}
-                  />
-                ))}
-              </div>
-            </div>
           </div>
 
           {/* Marble State Machine Controls - Moved below grid */}
@@ -404,7 +386,8 @@ export default function Home() {
                 <span>
                   Marbles: {marbles.filter((m) => m.state === "falling").length}{" "}
                   falling, {marbles.filter((m) => m.state === "rolling").length}{" "}
-                  rolling
+                  rolling, {marbles.filter((m) => m.state === "behind").length}{" "}
+                  behind
                 </span>
               )}
             </div>

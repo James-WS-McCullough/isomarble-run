@@ -10,20 +10,48 @@ interface ScreenPosition {
 interface MarbleProps {
   position: ScreenPosition;
   rotation?: number;
+  state?: "rolling" | "falling" | "behind";
+  behindCoordinates?: { x: number; y: number };
 }
 
 /**
  * Component for rendering a marble with base and highlight sprites
  */
-export const Marble: React.FC<MarbleProps> = ({ position, rotation = 0 }) => {
+export const Marble: React.FC<MarbleProps> = ({
+  position,
+  rotation = 0,
+  state = "falling",
+  behindCoordinates,
+}) => {
   // Use screen coordinates directly for positioning - no grid conversion needed
   const finalScreenPos = {
     x: position.x,
     y: position.y - 50, // Raise marble 50px above the surface
   };
 
-  // Calculate z-index based on screen position
-  const zIndex = 200; // High z-index to appear above track pieces
+  // Calculate z-index based on state
+  // Track pieces have z-index of 100 + (x + y)
+  // Normal marbles: 200 (above all track pieces)
+  // Behind marbles: use same formula as track pieces but with behindCoordinates - 1
+  // This puts them just behind the track piece they fell off of
+  const zIndex =
+    state === "behind" && behindCoordinates !== undefined
+      ? 100 + (behindCoordinates.x + behindCoordinates.y) - 1
+      : state === "behind"
+      ? 1
+      : 200;
+
+  // Debug logging for behind state
+  if (state === "behind") {
+    console.log(
+      "Behind marble - state:",
+      state,
+      "behindCoordinates:",
+      behindCoordinates,
+      "final zIndex:",
+      zIndex
+    );
+  }
 
   const marbleSize = 50; // Marble size (half of 100px sprite size)
 

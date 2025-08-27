@@ -17,6 +17,7 @@ export interface MarbleStateMachine {
   state: MarbleStateType;
   momentum: MomentumDirection;
   rotation: number;
+  behindCoordinates?: GridPosition; // Grid coordinates where marble entered 'behind' state
 }
 
 /**
@@ -50,37 +51,96 @@ export function updateMarbleStateMachine(
 ): MarbleStateMachine {
   let newMarble = { ...marble };
 
+  // Handle 'behind' state logic
+  if ((marble.state as MarbleStateType) === "behind") {
+    // Behind marbles behave exactly like falling marbles
+    newMarble.state = "behind";
+    newMarble.momentum = "0";
+
+    // Move +1 in both X and Y directions (straight downwards in isometric)
+    const newPosition = {
+      x: marble.gridPosition.x + 1,
+      y: marble.gridPosition.y + 1,
+    };
+    newMarble.gridPosition = wrapGridPosition(newPosition);
+
+    // AFTER movement, check if marble should transition from 'behind' to 'falling'
+    if (!isMarbleOccluded(newMarble.gridPosition, trackPieces)) {
+      // No longer occluded, change to falling
+      newMarble.state = "falling";
+      newMarble.behindCoordinates = undefined; // Clear behind coordinates
+    }
+
+    return newMarble;
+  }
+
   // STATE MACHINE LOGIC:
   // 1. Check if marble is on top of a block
   const currentTrack = getTrackAt(marble.gridPosition, trackPieces);
 
   if (currentTrack) {
-    // 1. Marble is on top of a block - change state to rolling
-    newMarble.state = "rolling";
-
-    // Use block's information to calculate new momentum
-    const blockBehavior = getBlockBehavior(currentTrack.blockName);
-    if (blockBehavior) {
-      const { outputState, outputMomentum } = applyBlockBehavior(
-        marble.momentum,
-        blockBehavior
-      );
-      newMarble.state = outputState;
-      newMarble.momentum = outputMomentum;
-
-      // Move marble in new momentum direction one space
-      const newPosition = moveMarbleOneStep(newMarble, outputMomentum);
+    // 1. Marble is on top of a block - change state to rolling (unless behind)
+    // Don't allow rolling if marble is in 'behind' state
+    if ((marble.state as MarbleStateType) === "behind") {
+      // Behind marbles can't start rolling even on track pieces
+      newMarble.state = "behind";
+      const newPosition = {
+        x: marble.gridPosition.x + 1,
+        y: marble.gridPosition.y + 1,
+      };
       newMarble.gridPosition = wrapGridPosition(newPosition);
+      newMarble.momentum = "0";
+    } else {
+      newMarble.state = "rolling";
 
-      // Update rotation if rolling
-      if (newMarble.state === "rolling") {
-        newMarble.rotation += 15; // Rotate 15 degrees per step
-        if (newMarble.rotation >= 360) newMarble.rotation -= 360;
+      // Use block's information to calculate new momentum
+      const blockBehavior = getBlockBehavior(currentTrack.blockName);
+      if (blockBehavior) {
+        const { outputState, outputMomentum } = applyBlockBehavior(
+          marble.momentum,
+          blockBehavior
+        );
+        newMarble.state = outputState;
+        newMarble.momentum = outputMomentum;
+
+        // Move marble in new momentum direction one space
+        const newPosition = moveMarbleOneStep(newMarble, outputMomentum);
+        newMarble.gridPosition = wrapGridPosition(newPosition);
+
+        // Update rotation if rolling
+        if (newMarble.state === "rolling") {
+          newMarble.rotation += 15; // Rotate 15 degrees per step
+          if (newMarble.rotation >= 360) newMarble.rotation -= 360;
+        }
       }
     }
   } else {
     // 2. Marble is not on top of a block - set state to falling
-    newMarble.state = "falling";
+
+    // Check if marble was rolling with negative momentum (fell backwards off a block)
+    const wasRollingWithNegativeMomentum =
+      marble.state === "rolling" &&
+      (marble.momentum === "-x" || marble.momentum === "-y");
+
+    if (wasRollingWithNegativeMomentum) {
+      newMarble.state = "behind";
+      // Store the coordinates where marble entered behind state
+      // We'll use these coordinates with the same z-index formula as track pieces
+      newMarble.behindCoordinates = {
+        x: marble.gridPosition.x,
+        y: marble.gridPosition.y,
+      };
+      console.log(
+        "Marble entering behind state at",
+        marble.gridPosition,
+        "behind coordinates stored:",
+        newMarble.behindCoordinates
+      );
+    } else {
+      newMarble.state = "falling";
+      newMarble.behindCoordinates = undefined; // Clear any previous behind coordinates
+    }
+
     newMarble.momentum = "0";
 
     // Move +1 in both X and Y directions (straight downwards in isometric)
@@ -137,17 +197,29 @@ export function gridToScreenPosition(gridPosition: GridPosition): {
 }
 
 /**
- * Wrap grid position to handle screen boundaries (16x16 grid)
+ * Wrap grid position to handle screen boundaries (-10 to +10 grid)
  */
 function wrapGridPosition(position: { x: number; y: number }): GridPosition {
-  const gridSize = 16;
+  const minBound = -10;
+  const maxBound = 10;
+  const gridSize = maxBound - minBound + 1; // 21 total positions
 
-  let wrappedX = position.x % gridSize;
-  let wrappedY = position.y % gridSize;
+  let wrappedX = position.x;
+  let wrappedY = position.y;
 
-  // Handle negative wrapping
-  if (wrappedX < 0) wrappedX += gridSize;
-  if (wrappedY < 0) wrappedY += gridSize;
+  // Wrap X coordinate
+  if (wrappedX > maxBound) {
+    wrappedX = minBound + ((wrappedX - minBound) % gridSize);
+  } else if (wrappedX < minBound) {
+    wrappedX = maxBound - ((minBound - wrappedX - 1) % gridSize);
+  }
+
+  // Wrap Y coordinate
+  if (wrappedY > maxBound) {
+    wrappedY = minBound + ((wrappedY - minBound) % gridSize);
+  } else if (wrappedY < minBound) {
+    wrappedY = maxBound - ((minBound - wrappedY - 1) % gridSize);
+  }
 
   return { x: wrappedX, y: wrappedY };
 }
@@ -165,6 +237,39 @@ function getTrackAt(
         piece.position.x === position.x && piece.position.y === position.y
     ) || null
   );
+}
+
+/**
+ * Check if a marble is occluded by track pieces
+ * A marble is occluded if there's a track piece at any of these relative positions:
+ * -1x, -1y, -1x-1y, -2x-1y, -2y-1x, -2x-2y
+ * (Note: Same position (0,0) is excluded - marble can land on blocks)
+ */
+function isMarbleOccluded(
+  marblePosition: GridPosition,
+  trackPieces: TrackPiece[]
+): boolean {
+  const occlusionOffsets = [
+    { x: -1, y: 0 }, // -1x
+    { x: 0, y: -1 }, // -1y
+    { x: -1, y: -1 }, // -1x-1y
+    { x: -2, y: -1 }, // -2x-1y
+    { x: -1, y: -2 }, // -2y-1x (interpreted as -1x-2y)
+    { x: -2, y: -2 }, // -2x-2y
+  ];
+
+  for (const offset of occlusionOffsets) {
+    const checkPosition = {
+      x: marblePosition.x + offset.x,
+      y: marblePosition.y + offset.y,
+    };
+
+    if (getTrackAt(checkPosition, trackPieces)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 /**

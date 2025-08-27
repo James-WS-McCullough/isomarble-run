@@ -7,6 +7,8 @@ import {
   GridPosition,
 } from "@/lib/isometric";
 import { IsometricSprite } from "./IsometricSprite";
+import { Marble } from "./Marble";
+import { gridToScreenPosition } from "@/lib/marble-state-machine";
 
 interface IsometricGridProps {
   config: IsometricGridConfig;
@@ -16,6 +18,13 @@ interface IsometricGridProps {
     position: GridPosition;
     spritePath: string;
     id: string;
+  }>;
+  marbles?: Array<{
+    id: string;
+    gridPosition: GridPosition;
+    state: "rolling" | "falling" | "behind";
+    rotation: number;
+    behindCoordinates?: GridPosition;
   }>;
   previewSprite?: {
     position: GridPosition;
@@ -39,6 +48,7 @@ export const IsometricGrid: React.FC<IsometricGridProps> = ({
   width,
   height,
   sprites = [],
+  marbles = [],
   previewSprite,
   onGridClick,
   onGridHover,
@@ -160,6 +170,17 @@ export const IsometricGrid: React.FC<IsometricGridProps> = ({
             spritePath={sprite.spritePath}
             config={config}
             onClick={(gridPos) => handleSpriteClick(gridPos, sprite.id)}
+          />
+        ))}
+
+        {/* Render marbles in the same container as sprites for proper z-index layering */}
+        {marbles.map((marble) => (
+          <Marble
+            key={marble.id}
+            position={gridToScreenPosition(marble.gridPosition)}
+            rotation={marble.rotation}
+            state={marble.state}
+            behindCoordinates={marble.behindCoordinates}
           />
         ))}
 

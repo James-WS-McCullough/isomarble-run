@@ -5,8 +5,11 @@ export type MomentumDirection = "+x" | "+y" | "-x" | "-y" | "0";
 
 /**
  * Marble states for the state machine
+ * - rolling: marble is moving on a track piece
+ * - falling: marble is falling through empty space
+ * - behind: marble is falling behind track pieces (low z-index)
  */
-export type MarbleStateType = "rolling" | "falling";
+export type MarbleStateType = "rolling" | "falling" | "behind";
 
 /**
  * Conditional output based on input momentum
@@ -64,6 +67,60 @@ export const BLOCK_TYPES: BlockBehavior[] = [
     blockName: "LandingPlusY",
     defaultOutputMomentum: "+y",
     conditionalOutputs: [],
+  },
+  {
+    blockPath: "/sprites/isometric-cubes/LandingMinusY.png",
+    blockName: "LandingMinusY",
+    defaultOutputMomentum: "-y",
+    conditionalOutputs: [],
+  },
+  {
+    blockPath: "/sprites/isometric-cubes/LandingMinusX.png",
+    blockName: "LandingMinusX",
+    defaultOutputMomentum: "-x",
+    conditionalOutputs: [],
+  },
+  {
+    blockPath: "/sprites/isometric-cubes/LandingPlusX.png",
+    blockName: "LandingPlusX",
+    defaultOutputMomentum: "+x",
+    conditionalOutputs: [],
+  },
+  {
+    blockPath: "/sprites/isometric-cubes/TurnXY.png",
+    blockName: "TurnXY",
+    defaultOutputMomentum: ["+x", "+y"],
+    conditionalOutputs: [
+      { inputMomentum: "-x", outputMomentum: "+y" },
+      { inputMomentum: "-y", outputMomentum: "+x" },
+    ],
+  },
+  {
+    blockPath: "/sprites/isometric-cubes/TurnXMinusY.png",
+    blockName: "TurnXMinusY",
+    defaultOutputMomentum: ["+x", "-y"],
+    conditionalOutputs: [
+      { inputMomentum: "-x", outputMomentum: "-y" },
+      { inputMomentum: "+y", outputMomentum: "+x" },
+    ],
+  },
+  {
+    blockPath: "/sprites/isometric-cubes/TurnYMinusX.png",
+    blockName: "TurnYMinusX",
+    defaultOutputMomentum: ["+y", "-x"],
+    conditionalOutputs: [
+      { inputMomentum: "-y", outputMomentum: "-x" },
+      { inputMomentum: "+x", outputMomentum: "+y" },
+    ],
+  },
+  {
+    blockPath: "/sprites/isometric-cubes/TurnMinusXMinusY.png",
+    blockName: "TurnMinusXMinusY",
+    defaultOutputMomentum: ["-x", "-y"],
+    conditionalOutputs: [
+      { inputMomentum: "+x", outputMomentum: "-y" },
+      { inputMomentum: "+y", outputMomentum: "-x" },
+    ],
   },
 ];
 
