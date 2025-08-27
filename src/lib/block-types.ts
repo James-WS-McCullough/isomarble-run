@@ -122,6 +122,12 @@ export const BLOCK_TYPES: BlockBehavior[] = [
       { inputMomentum: "+y", outputMomentum: "-x" },
     ],
   },
+  {
+    blockPath: "/sprites/isometric-cubes/TPlusX.png",
+    blockName: "TPlusX",
+    defaultOutputMomentum: ["+x", "-y", "+y"],
+    conditionalOutputs: [],
+  },
 ];
 
 /**

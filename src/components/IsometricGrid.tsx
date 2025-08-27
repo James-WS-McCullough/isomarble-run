@@ -25,6 +25,7 @@ interface IsometricGridProps {
     state: "rolling" | "falling" | "behind";
     rotation: number;
     behindCoordinates?: GridPosition;
+    momentum?: string;
   }>;
   previewSprite?: {
     position: GridPosition;
@@ -33,6 +34,7 @@ interface IsometricGridProps {
   previewMarble?: {
     position: GridPosition;
   };
+  isAutoMode?: boolean;
   onGridClick?: (gridPos: GridPosition) => void;
   onGridHover?: (gridPos: GridPosition) => void;
   onGridMouseDown?: () => void;
@@ -54,6 +56,7 @@ export const IsometricGrid: React.FC<IsometricGridProps> = ({
   marbles = [],
   previewSprite,
   previewMarble,
+  isAutoMode = false,
   onGridClick,
   onGridHover,
   onGridMouseDown,
@@ -185,6 +188,8 @@ export const IsometricGrid: React.FC<IsometricGridProps> = ({
             rotation={marble.rotation}
             state={marble.state}
             behindCoordinates={marble.behindCoordinates}
+            momentum={marble.momentum}
+            isAutoMode={isAutoMode}
           />
         ))}
 

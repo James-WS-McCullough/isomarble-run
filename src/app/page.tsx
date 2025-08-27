@@ -32,12 +32,14 @@ export default function Home() {
   // Fixed sprite size: 100px with grid cells 50px × 25px
   const config = createIsometricGrid(100);
 
-  const [sprites, setSprites] = useState<Array<{
-    id: string;
-    position: GridPosition;
-    spritePath: string;
-    blockName: string;
-  }>>([]);
+  const [sprites, setSprites] = useState<
+    Array<{
+      id: string;
+      position: GridPosition;
+      spritePath: string;
+      blockName: string;
+    }>
+  >([]);
 
   const [selectedSpriteType, setSelectedSpriteType] = useState(SPRITE_TYPES[0]);
   const [previewPosition, setPreviewPosition] = useState<GridPosition | null>(
@@ -61,7 +63,7 @@ export default function Home() {
 
     const interval = setInterval(() => {
       stepMarbles();
-    }, 300);
+    }, 150); // Reduced from 300ms to 150ms for smoother continuous motion
 
     return () => clearInterval(interval);
   }, [autoMode, marbles]);
@@ -192,7 +194,9 @@ export default function Home() {
                     ? "border-red-500 bg-red-900/30"
                     : "border-gray-600 bg-gray-700 hover:border-gray-500 hover:bg-gray-600"
                 }`}
-                title={isPlacingMarble ? "Cancel marble placement" : "Place marble"}
+                title={
+                  isPlacingMarble ? "Cancel marble placement" : "Place marble"
+                }
               >
                 <img
                   src="/sprites/marble/MarbleBase.png"
@@ -255,6 +259,7 @@ export default function Home() {
               height={600}
               sprites={sprites}
               marbles={marbles}
+              isAutoMode={autoMode}
               previewSprite={
                 previewPosition && !isPlacingMarble
                   ? {
@@ -297,9 +302,7 @@ export default function Home() {
                 <div>
                   Behind: {marbles.filter((m) => m.state === "behind").length}
                 </div>
-                <div className="ml-auto">
-                  Total: {marbles.length}
-                </div>
+                <div className="ml-auto">Total: {marbles.length}</div>
               </div>
             </div>
           )}
