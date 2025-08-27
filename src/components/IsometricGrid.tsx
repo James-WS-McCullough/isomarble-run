@@ -1,8 +1,12 @@
-'use client';
+"use client";
 
-import React, { useRef, useCallback } from 'react';
-import { IsometricGridConfig, screenToGrid, GridPosition } from '@/lib/isometric';
-import { IsometricSprite } from './IsometricSprite';
+import React, { useRef, useCallback } from "react";
+import {
+  IsometricGridConfig,
+  screenToGrid,
+  GridPosition,
+} from "@/lib/isometric";
+import { IsometricSprite } from "./IsometricSprite";
 
 interface IsometricGridProps {
   config: IsometricGridConfig;
@@ -43,7 +47,7 @@ export const IsometricGrid: React.FC<IsometricGridProps> = ({
   onGridMouseLeave,
   onSpriteClick,
   showGrid = true,
-  className = '',
+  className = "",
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -158,7 +162,7 @@ export const IsometricGrid: React.FC<IsometricGridProps> = ({
             onClick={(gridPos) => handleSpriteClick(gridPos, sprite.id)}
           />
         ))}
-        
+
         {/* Preview sprite */}
         {previewSprite && (
           <IsometricSprite

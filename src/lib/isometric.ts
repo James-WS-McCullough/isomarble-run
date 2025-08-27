@@ -37,7 +37,7 @@ export function gridToScreen(
   config: IsometricGridConfig
 ): ScreenPosition {
   const { gridCellWidth, gridCellHeight } = config;
-  
+
   return {
     x: (gridPos.x - gridPos.y) * gridCellWidth,
     y: (gridPos.x + gridPos.y) * gridCellHeight,
@@ -52,10 +52,10 @@ export function screenToGrid(
   config: IsometricGridConfig
 ): GridPosition {
   const { gridCellWidth, gridCellHeight } = config;
-  
+
   const x = (screenPos.x / gridCellWidth + screenPos.y / gridCellHeight) / 2;
   const y = (screenPos.y / gridCellHeight - screenPos.x / gridCellWidth) / 2;
-  
+
   return {
     x: Math.round(x),
     y: Math.round(y),
@@ -81,7 +81,7 @@ export function getSpritePlacement(
 ): ScreenPosition {
   const screenPos = gridToScreen(gridPos, config);
   const offset = getSpriteOffset(config);
-  
+
   return {
     x: screenPos.x + offset.x,
     y: screenPos.y + offset.y,

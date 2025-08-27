@@ -1,7 +1,11 @@
-'use client';
+"use client";
 
-import React from 'react';
-import { GridPosition, IsometricGridConfig, getSpritePlacement } from '@/lib/isometric';
+import React from "react";
+import {
+  GridPosition,
+  IsometricGridConfig,
+  getSpritePlacement,
+} from "@/lib/isometric";
 
 interface IsometricSpriteProps {
   gridPosition: GridPosition;
@@ -19,8 +23,8 @@ export const IsometricSprite: React.FC<IsometricSpriteProps> = ({
   gridPosition,
   spritePath,
   config,
-  alt = 'Isometric sprite',
-  className = '',
+  alt = "Isometric sprite",
+  className = "",
   onClick,
 }) => {
   const screenPos = getSpritePlacement(gridPosition, config);
@@ -48,10 +52,10 @@ export const IsometricSprite: React.FC<IsometricSpriteProps> = ({
         height: `${config.spriteSize}px`,
         minWidth: `${config.spriteSize}px`,
         minHeight: `${config.spriteSize}px`,
-        imageRendering: 'pixelated',
+        imageRendering: "pixelated",
         zIndex: zIndex,
-        position: 'absolute',
-        boxSizing: 'border-box',
+        position: "absolute",
+        boxSizing: "border-box",
       }}
       onClick={handleClick}
     />

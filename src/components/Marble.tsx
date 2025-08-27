@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import React from 'react';
+import React from "react";
 
 interface ScreenPosition {
   x: number;
@@ -15,10 +15,7 @@ interface MarbleProps {
 /**
  * Component for rendering a marble with base and highlight sprites
  */
-export const Marble: React.FC<MarbleProps> = ({
-  position,
-  rotation = 0,
-}) => {
+export const Marble: React.FC<MarbleProps> = ({ position, rotation = 0 }) => {
   // Use screen coordinates directly for positioning - no grid conversion needed
   const finalScreenPos = {
     x: position.x,
@@ -31,7 +28,7 @@ export const Marble: React.FC<MarbleProps> = ({
   const marbleSize = 50; // Marble size (half of 100px sprite size)
 
   // Rotation transform
-  const transform = rotation !== 0 ? `rotate(${rotation}deg)` : 'none';
+  const transform = rotation !== 0 ? `rotate(${rotation}deg)` : "none";
 
   return (
     <>
@@ -47,14 +44,14 @@ export const Marble: React.FC<MarbleProps> = ({
           height: `${marbleSize}px`,
           minWidth: `${marbleSize}px`,
           minHeight: `${marbleSize}px`,
-          imageRendering: 'pixelated',
+          imageRendering: "pixelated",
           zIndex: zIndex,
-          position: 'absolute',
-          boxSizing: 'border-box',
+          position: "absolute",
+          boxSizing: "border-box",
           transform: transform,
         }}
       />
-      
+
       {/* Marble highlight - doesn't rotate */}
       <img
         src="/sprites/marble/MarbleHilight.png"
@@ -67,11 +64,11 @@ export const Marble: React.FC<MarbleProps> = ({
           height: `${marbleSize}px`,
           minWidth: `${marbleSize}px`,
           minHeight: `${marbleSize}px`,
-          imageRendering: 'pixelated',
+          imageRendering: "pixelated",
           zIndex: zIndex + 1,
-          position: 'absolute',
-          boxSizing: 'border-box',
-          transform: 'none', // Highlight doesn't rotate
+          position: "absolute",
+          boxSizing: "border-box",
+          transform: "none", // Highlight doesn't rotate
         }}
       />
     </>
