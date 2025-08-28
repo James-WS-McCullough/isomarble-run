@@ -7,6 +7,7 @@ import {
   momentumToVelocity,
   velocityToMomentum,
 } from "./block-types";
+import { updateMarble, createMarble as createMarblePhysics, MarbleState } from "./marble-physics";
 
 /**
  * Simplified marble state for the state machine
@@ -210,31 +211,45 @@ export function gridToScreenPosition(gridPosition: GridPosition): {
 }
 
 /**
- * Wrap grid position to handle screen boundaries (-10 to +10 grid)
+ * Calculate the highest position in the same diagonal column before hitting the top boundary
  */
-function wrapGridPosition(position: { x: number; y: number }): GridPosition {
+function getHighestPositionInDiagonal(position: { x: number; y: number }): GridPosition {
   const minBound = -10;
   const maxBound = 10;
-  const gridSize = maxBound - minBound + 1; // 21 total positions
+  
+  let testX = position.x;
+  let testY = position.y;
+  
+  // Move backwards along the diagonal (-1x, -1y) until we would hit the top boundary
+  while (testX - 1 >= minBound && testY - 1 >= minBound) {
+    testX -= 1;
+    testY -= 1;
+  }
+  
+  // testX, testY is now the highest position in this diagonal column
+  return { x: testX, y: testY };
+}
 
-  let wrappedX = position.x;
-  let wrappedY = position.y;
+/**
+ * Check if the next step (+1x, +1y) would take the marble outside the grid bounds
+ */
+function wouldNextStepExceedBounds(position: { x: number; y: number }): boolean {
+  const maxBound = 10;
+  return (position.x + 1 > maxBound) || (position.y + 1 > maxBound);
+}
 
-  // Wrap X coordinate
-  if (wrappedX > maxBound) {
-    wrappedX = minBound + ((wrappedX - minBound) % gridSize);
-  } else if (wrappedX < minBound) {
-    wrappedX = maxBound - ((minBound - wrappedX - 1) % gridSize);
+/**
+ * Wrap grid position to handle screen boundaries (-10 to +10 grid with predictive diagonal wrapping)
+ */
+function wrapGridPosition(position: { x: number; y: number }): GridPosition {
+  // Check if the NEXT step would take us outside bounds
+  // If so, wrap to the highest position in the diagonal column instead
+  if (wouldNextStepExceedBounds(position)) {
+    return getHighestPositionInDiagonal(position);
   }
 
-  // Wrap Y coordinate
-  if (wrappedY > maxBound) {
-    wrappedY = minBound + ((wrappedY - minBound) % gridSize);
-  } else if (wrappedY < minBound) {
-    wrappedY = maxBound - ((minBound - wrappedY - 1) % gridSize);
-  }
-
-  return { x: wrappedX, y: wrappedY };
+  // If within bounds, return the position as-is
+  return { x: position.x, y: position.y };
 }
 
 /**

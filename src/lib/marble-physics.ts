@@ -272,24 +272,6 @@ export function updateMarble(
         }
       }
 
-      // Handle screen wrapping
-      const gridScreenWidth = 16 * 50; // 16 grid cells * 50px width
-      const gridScreenHeight = 16 * 25; // 16 grid cells * 25px height
-
-      if (newMarble.screenPosition.y > gridScreenHeight * 2) {
-        // Wrap to top
-        newMarble.screenPosition.y = -50;
-        newMarble.fallTarget = undefined;
-        newMarble.fallAcceleration = 0.5;
-      }
-
-      if (newMarble.screenPosition.x > gridScreenWidth) {
-        // Wrap to left side
-        newMarble.screenPosition.x = -50;
-      } else if (newMarble.screenPosition.x < -50) {
-        // Wrap to right side
-        newMarble.screenPosition.x = gridScreenWidth;
-      }
       break;
 
     case "rolling":
