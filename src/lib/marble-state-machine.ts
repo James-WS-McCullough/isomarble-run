@@ -29,6 +29,7 @@ export interface TrackPiece {
   blockName: string;
   spritePath: string;
   hue?: number; // Track piece hue (0-360)
+  height?: number; // Height of the block (number of wall layers below)
 }
 
 /**

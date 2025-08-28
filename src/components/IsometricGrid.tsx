@@ -19,6 +19,7 @@ interface IsometricGridProps {
     spritePath: string;
     id: string;
     hue?: number; // Individual hue for each sprite
+    height?: number; // Height of the block (number of wall layers below)
   }>;
   marbles?: Array<{
     id: string;
@@ -37,14 +38,27 @@ interface IsometricGridProps {
   };
   isAutoMode?: boolean;
   hueShift?: number; // Hue shift in degrees (0-360)
+  activeTool?: "place" | "move" | "select" | "marble" | "deepen"; // Add select to activeTool prop
+  selectedSpriteId?: string | null; // Add selectedSpriteId prop
+  isDragging?: boolean; // Add isDragging prop
   onGridClick?: (gridPos: GridPosition) => void;
   onGridHover?: (gridPos: GridPosition) => void;
-  onGridMouseDown?: () => void;
+  onGridMouseDown?: (gridPos: GridPosition) => void;
   onGridMouseUp?: () => void;
   onGridMouseLeave?: () => void;
+  onSelectionChange?: (gridPos: GridPosition) => void; // For selection rectangle during drag
+  onScreenMouseDown?: (screenPos: {x: number, y: number}) => void; // For screen-space selection
+  onScreenMouseMove?: (screenPos: {x: number, y: number}) => void; // For screen-space selection
   onSpriteClick?: (gridPos: GridPosition, spriteId: string) => void;
+  onSpriteMouseDown?: (gridPos: GridPosition, spriteId: string) => void;
+  onSpriteContextMenu?: (gridPos: GridPosition, spriteId: string) => void;
   showGrid?: boolean;
   className?: string;
+  // Selection rectangle props (using screen coordinates)
+  isSelecting?: boolean;
+  selectionStart?: {x: number, y: number} | null;
+  selectionEnd?: {x: number, y: number} | null;
+  selectedSprites?: string[];
 }
 
 /**
@@ -60,14 +74,26 @@ export const IsometricGrid: React.FC<IsometricGridProps> = ({
   previewMarble,
   isAutoMode = false,
   hueShift = 0,
+  activeTool = "place",
+  selectedSpriteId = null,
+  isDragging = false,
   onGridClick,
   onGridHover,
   onGridMouseDown,
   onGridMouseUp,
   onGridMouseLeave,
+  onSelectionChange,
+  onScreenMouseDown,
+  onScreenMouseMove,
   onSpriteClick,
+  onSpriteMouseDown,
+  onSpriteContextMenu,
   showGrid = true,
   className = "",
+  isSelecting = false,
+  selectionStart,
+  selectionEnd,
+  selectedSprites = [],
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -97,7 +123,7 @@ export const IsometricGrid: React.FC<IsometricGridProps> = ({
 
   const handleContainerMouseMove = useCallback(
     (event: React.MouseEvent<HTMLDivElement>) => {
-      if (!containerRef.current || !onGridHover) return;
+      if (!containerRef.current) return;
 
       const rect = containerRef.current.getBoundingClientRect();
       const screenPos = {
@@ -106,9 +132,20 @@ export const IsometricGrid: React.FC<IsometricGridProps> = ({
       };
 
       const gridPos = screenToGrid(screenPos, config);
-      onGridHover(gridPos);
+
+      if (onGridHover) {
+        onGridHover(gridPos);
+      }
+
+      if (onSelectionChange) {
+        onSelectionChange(gridPos);
+      }
+
+      if (onScreenMouseMove) {
+        onScreenMouseMove(screenPos);
+      }
     },
-    [config, width, height, onGridHover]
+    [config, width, height, onGridHover, onSelectionChange, onScreenMouseMove]
   );
 
   const handleSpriteClick = useCallback(
@@ -118,6 +155,48 @@ export const IsometricGrid: React.FC<IsometricGridProps> = ({
       }
     },
     [onSpriteClick]
+  );
+
+  const handleSpriteMouseDown = useCallback(
+    (gridPos: GridPosition, spriteId: string) => {
+      if (onSpriteMouseDown) {
+        onSpriteMouseDown(gridPos, spriteId);
+      }
+    },
+    [onSpriteMouseDown]
+  );
+
+  const handleSpriteContextMenu = useCallback(
+    (gridPos: GridPosition, spriteId: string) => {
+      if (onSpriteContextMenu) {
+        onSpriteContextMenu(gridPos, spriteId);
+      }
+    },
+    [onSpriteContextMenu]
+  );
+
+  const handleContainerMouseDown = useCallback(
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      if (!containerRef.current) return;
+
+      const rect = containerRef.current.getBoundingClientRect();
+      const screenPos = {
+        x: event.clientX - rect.left - width / 2,
+        y: event.clientY - rect.top - height / 2,
+      };
+
+      // Call screen coordinate handler if provided
+      if (onScreenMouseDown) {
+        onScreenMouseDown(screenPos);
+      }
+
+      // Call grid coordinate handler if provided
+      if (onGridMouseDown) {
+        const gridPos = screenToGrid(screenPos, config);
+        onGridMouseDown(gridPos);
+      }
+    },
+    [config, width, height, onGridMouseDown, onScreenMouseDown]
   );
 
   // Generate grid lines for visualization
@@ -151,18 +230,48 @@ export const IsometricGrid: React.FC<IsometricGridProps> = ({
     return lines;
   };
 
+  // Render selection rectangle using screen coordinates
+  const renderSelectionRectangle = () => {
+    if (!isSelecting || !selectionStart || !selectionEnd) return null;
+
+    const minX = Math.min(selectionStart.x, selectionEnd.x);
+    const maxX = Math.max(selectionStart.x, selectionEnd.x);
+    const minY = Math.min(selectionStart.y, selectionEnd.y);
+    const maxY = Math.max(selectionStart.y, selectionEnd.y);
+
+    const rectWidth = maxX - minX;
+    const rectHeight = maxY - minY;
+
+    // Render a visual selection rectangle (no background, just border)
+    return (
+      <div
+        className="absolute border-2 border-blue-400 border-dashed pointer-events-none"
+        style={{
+          left: `${minX + width / 2}px`,
+          top: `${minY + height / 2}px`,
+          width: `${rectWidth}px`,
+          height: `${rectHeight}px`,
+          zIndex: 15,
+        }}
+      />
+    );
+  };
+
   return (
     <div
       ref={containerRef}
       className={`relative overflow-hidden ${className}`}
       style={{ width, height }}
       onMouseMove={handleContainerMouseMove}
-      onMouseDown={onGridMouseDown}
+      onMouseDown={handleContainerMouseDown}
       onMouseUp={handleContainerMouseUp}
       onMouseLeave={onGridMouseLeave}
     >
       {/* Grid visualization */}
       {renderGridLines()}
+
+      {/* Selection rectangle */}
+      {renderSelectionRectangle()}
 
       {/* Sprites container */}
       <div
@@ -173,16 +282,74 @@ export const IsometricGrid: React.FC<IsometricGridProps> = ({
           zIndex: 5,
         }}
       >
-        {sprites.map((sprite) => (
-          <IsometricSprite
-            key={sprite.id}
-            gridPosition={sprite.position}
-            spritePath={sprite.spritePath}
-            config={config}
-            hueShift={sprite.hue !== undefined ? sprite.hue : hueShift}
-            onClick={(gridPos) => handleSpriteClick(gridPos, sprite.id)}
-          />
-        ))}
+        {/* Render all sprites and their walls */}
+        {sprites.flatMap((sprite) => {
+          const elements = [];
+
+          // Calculate the z-index for the main sprite (will be used for walls too)
+          const spriteZIndex = 100 + (sprite.position.x + sprite.position.y);
+
+          // First, render walls based on height (from bottom to top)
+          if (sprite.height && sprite.height > 0) {
+            for (let layer = sprite.height; layer >= 1; layer--) {
+              elements.push(
+                <IsometricSprite
+                  key={`${sprite.id}-wall-${layer}`}
+                  gridPosition={{
+                    x: sprite.position.x + layer,
+                    y: sprite.position.y + layer,
+                  }}
+                  spritePath="/sprites/isometric-cubes/Walls.png"
+                  config={config}
+                  hueShift={sprite.hue !== undefined ? sprite.hue : hueShift}
+                  zIndexOverride={spriteZIndex - layer} // Walls appear slightly behind the main sprite
+                />
+              );
+            }
+          }
+
+          // Then render the main sprite on top
+          elements.push(
+            <IsometricSprite
+              key={sprite.id}
+              gridPosition={sprite.position}
+              spritePath={sprite.spritePath}
+              config={config}
+              hueShift={sprite.hue !== undefined ? sprite.hue : hueShift}
+              onClick={
+                activeTool === "move" ||
+                activeTool === "select" ||
+                activeTool === "deepen"
+                  ? (gridPos) => handleSpriteClick(gridPos, sprite.id)
+                  : undefined
+              }
+              onMouseDown={
+                activeTool === "move" || activeTool === "select"
+                  ? (gridPos) => handleSpriteMouseDown(gridPos, sprite.id)
+                  : undefined
+              }
+              onContextMenu={
+                activeTool === "deepen"
+                  ? (gridPos) => handleSpriteContextMenu(gridPos, sprite.id)
+                  : undefined
+              }
+              isDragging={isDragging && selectedSpriteId === sprite.id}
+              className={
+                activeTool === "move" ||
+                activeTool === "select" ||
+                activeTool === "deepen"
+                  ? `cursor-pointer hover:brightness-110 ${
+                      selectedSprites.includes(sprite.id)
+                        ? "ring-2 ring-blue-400 ring-offset-2"
+                        : ""
+                    }`
+                  : ""
+              }
+            />
+          );
+
+          return elements;
+        })}
 
         {/* Render marbles in the same container as sprites for proper z-index layering */}
         {marbles.map((marble) => (
