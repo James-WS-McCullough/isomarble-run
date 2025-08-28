@@ -117,26 +117,9 @@ export const Marble: React.FC<MarbleProps> = ({
     };
   }, [state, isAutoMode]);
 
-  // Use CSS transitions for smooth position changes, but allow for instant warps
-  const deltaX = position.x - prevPosition.x;
-  const deltaY = position.y - prevPosition.y;
-  const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-  const isWarping = distance > 150;
-
-  // Reset rotations on warp to prevent jarring jumps
-  useEffect(() => {
-    if (isWarping) {
-      setClockwiseRotation(0);
-      setCounterclockwiseRotation(0);
-    }
-  }, [isWarping]);
-
-  const transitionClasses = !isWarping
-    ? isAutoMode
-      ? "transition-all duration-150 ease-linear"
-      : "transition-all duration-300 ease-out"
-    : "";
-
+  const transitionClasses = isAutoMode
+    ? "transition-all duration-150 ease-linear"
+    : "transition-all duration-300 ease-out";
   const baseStyle = {
     left: `${finalScreenPos.x - marbleSize / 2}px`,
     top: `${finalScreenPos.y - marbleSize / 2}px`,
@@ -162,9 +145,7 @@ export const Marble: React.FC<MarbleProps> = ({
           transform: `rotate(${clockwiseRotation}deg)`,
           opacity:
             state === "rolling" && rollingDirection === "clockwise" ? 1 : 0,
-          transition: isWarping
-            ? "opacity 0s"
-            : `opacity 0.1s ease, ${transitionClasses}`,
+          transition: `opacity 0.1s ease, ${transitionClasses}`,
         }}
       />
 
@@ -180,9 +161,7 @@ export const Marble: React.FC<MarbleProps> = ({
             state === "rolling" && rollingDirection === "counterclockwise"
               ? 1
               : 0,
-          transition: isWarping
-            ? "opacity 0s"
-            : `opacity 0.1s ease, ${transitionClasses}`,
+          transition: `opacity 0.1s ease, ${transitionClasses}`,
         }}
       />
 
@@ -195,9 +174,7 @@ export const Marble: React.FC<MarbleProps> = ({
           ...baseStyle,
           transform: "none",
           opacity: state !== "rolling" ? 1 : 0,
-          transition: isWarping
-            ? "opacity 0s"
-            : `opacity 0.1s ease, ${transitionClasses}`,
+          transition: `opacity 0.1s ease, ${transitionClasses}`,
         }}
       />
 

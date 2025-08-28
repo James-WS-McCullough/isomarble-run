@@ -11,6 +11,7 @@ import {
   TrackPiece,
 } from "@/lib/marble-state-machine";
 import { BLOCK_TYPES, getBlockBehavior } from "@/lib/block-types";
+import { useSoundManager } from "@/hooks/useSoundManager";
 
 // Convert block types to sprite types for the UI
 const SPRITE_TYPES = BLOCK_TYPES.map((block, index) => ({
@@ -49,6 +50,24 @@ export default function Home() {
   const [marbles, setMarbles] = useState<MarbleStateMachine[]>([]);
   const [isPlacingMarble, setIsPlacingMarble] = useState(false);
   const [autoMode, setAutoMode] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(false);
+
+  // Sound manager
+  const soundManager = useSoundManager(soundEnabled);
+
+  // Update sound manager when soundEnabled changes
+  useEffect(() => {
+    soundManager.setEnabled(soundEnabled);
+  }, [soundEnabled, soundManager]);
+
+  // Update sound manager with current marble states
+  useEffect(() => {
+    const marbleStates = marbles.map((marble) => ({
+      id: marble.id,
+      state: marble.state,
+    }));
+    soundManager.updateMarbles(marbleStates);
+  }, [marbles, soundManager]);
 
   // Convert sprites to track pieces for state machine
   const trackPieces: TrackPiece[] = sprites.map((sprite) => ({
@@ -236,6 +255,16 @@ export default function Home() {
                   className="w-4 h-4 text-blue-600 bg-gray-600 border-gray-500 rounded focus:ring-blue-500"
                 />
                 <span className="text-sm">Auto</span>
+              </label>
+
+              <label className="flex items-center gap-2 text-gray-200">
+                <input
+                  type="checkbox"
+                  checked={soundEnabled}
+                  onChange={(e) => setSoundEnabled(e.target.checked)}
+                  className="w-4 h-4 text-blue-600 bg-gray-600 border-gray-500 rounded focus:ring-blue-500"
+                />
+                <span className="text-sm">Sound</span>
               </label>
             </div>
           </div>
