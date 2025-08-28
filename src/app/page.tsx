@@ -95,37 +95,39 @@ export default function Home() {
       const newMarbles = currentMarbles.map((marble) =>
         updateMarbleStateMachine(marble, trackPieces)
       );
-      
+
       // Update track piece hues based on marble positions
       setSprites((currentSprites) => {
         return currentSprites.map((sprite) => {
           // Find marbles that are rolling FROM this tile (previous position)
           const marbleRollingFrom = newMarbles.find((newMarble) => {
-            const oldMarble = currentMarbles.find(m => m.id === newMarble.id);
+            const oldMarble = currentMarbles.find((m) => m.id === newMarble.id);
             if (!oldMarble || !newMarble.hue) return false;
-            
+
             // Check if marble was on this tile and is now rolling
-            const wasOnThisTile = 
-              oldMarble.gridPosition.x === sprite.position.x && 
+            const wasOnThisTile =
+              oldMarble.gridPosition.x === sprite.position.x &&
               oldMarble.gridPosition.y === sprite.position.y;
             const isNowRolling = newMarble.state === "rolling";
-            
+
             if (wasOnThisTile && isNowRolling) {
-              console.log(`Marble ${newMarble.id} rolling from tile at (${sprite.position.x}, ${sprite.position.y}) with hue ${newMarble.hue}`);
+              console.log(
+                `Marble ${newMarble.id} rolling from tile at (${sprite.position.x}, ${sprite.position.y}) with hue ${newMarble.hue}`
+              );
               return true;
             }
             return false;
           });
-          
+
           if (marbleRollingFrom && marbleRollingFrom.hue !== undefined) {
             // Update sprite hue to marble's hue
             return { ...sprite, hue: marbleRollingFrom.hue };
           }
-          
+
           return sprite;
         });
       });
-      
+
       return newMarbles;
     });
   }, [trackPieces]);
