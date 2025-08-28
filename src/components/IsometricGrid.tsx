@@ -18,6 +18,7 @@ interface IsometricGridProps {
     position: GridPosition;
     spritePath: string;
     id: string;
+    hue?: number; // Individual hue for each sprite
   }>;
   marbles?: Array<{
     id: string;
@@ -35,6 +36,7 @@ interface IsometricGridProps {
     position: GridPosition;
   };
   isAutoMode?: boolean;
+  hueShift?: number; // Hue shift in degrees (0-360)
   onGridClick?: (gridPos: GridPosition) => void;
   onGridHover?: (gridPos: GridPosition) => void;
   onGridMouseDown?: () => void;
@@ -57,6 +59,7 @@ export const IsometricGrid: React.FC<IsometricGridProps> = ({
   previewSprite,
   previewMarble,
   isAutoMode = false,
+  hueShift = 0,
   onGridClick,
   onGridHover,
   onGridMouseDown,
@@ -176,6 +179,7 @@ export const IsometricGrid: React.FC<IsometricGridProps> = ({
             gridPosition={sprite.position}
             spritePath={sprite.spritePath}
             config={config}
+            hueShift={sprite.hue !== undefined ? sprite.hue : hueShift}
             onClick={(gridPos) => handleSpriteClick(gridPos, sprite.id)}
           />
         ))}
@@ -199,6 +203,7 @@ export const IsometricGrid: React.FC<IsometricGridProps> = ({
             gridPosition={previewSprite.position}
             spritePath={previewSprite.spritePath}
             config={config}
+            hueShift={hueShift}
             className="opacity-50"
           />
         )}

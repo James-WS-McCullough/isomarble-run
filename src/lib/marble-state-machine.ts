@@ -17,6 +17,7 @@ export interface MarbleStateMachine {
   state: MarbleStateType;
   momentum: MomentumDirection;
   rotation: number;
+  hue?: number; // Marble's assigned hue (0-360)
   behindCoordinates?: GridPosition; // Grid coordinates where marble entered 'behind' state
 }
 
@@ -27,6 +28,7 @@ export interface TrackPiece {
   position: GridPosition;
   blockName: string;
   spritePath: string;
+  hue?: number; // Track piece hue (0-360)
 }
 
 /**
@@ -39,6 +41,7 @@ export function createMarble(position: GridPosition): MarbleStateMachine {
     state: "falling",
     momentum: "0", // Start with no momentum (falling)
     rotation: 0,
+    hue: Math.floor(Math.random() * 360), // Assign random hue on creation
   };
 }
 
@@ -68,6 +71,9 @@ export function updateMarbleStateMachine(
     if (!isMarbleOccluded(newMarble.gridPosition, trackPieces)) {
       // No longer occluded, change to falling
       newMarble.state = "falling";
+      // Add 30-140 degrees to current hue when entering falling state
+      const hueIncrement = 30 + Math.floor(Math.random() * 111); // Random 30-140
+      newMarble.hue = ((newMarble.hue || 0) + hueIncrement) % 360;
       newMarble.behindCoordinates = undefined; // Clear behind coordinates
     }
 
@@ -137,6 +143,12 @@ export function updateMarbleStateMachine(
         newMarble.behindCoordinates
       );
     } else {
+      // Add 30-140 degrees to current hue when entering falling state
+      if (marble.state !== "falling") {
+        const hueIncrement = 30 + Math.floor(Math.random() * 111); // Random 30-140
+        newMarble.hue = ((newMarble.hue || 0) + hueIncrement) % 360;
+      }
+
       newMarble.state = "falling";
       newMarble.behindCoordinates = undefined; // Clear any previous behind coordinates
     }

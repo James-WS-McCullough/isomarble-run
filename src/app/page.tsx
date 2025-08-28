@@ -39,6 +39,7 @@ export default function Home() {
       position: GridPosition;
       spritePath: string;
       blockName: string;
+      hue?: number; // Individual hue for each sprite (0-360)
     }>
   >([]);
 
@@ -74,6 +75,7 @@ export default function Home() {
     position: sprite.position,
     blockName: sprite.blockName,
     spritePath: sprite.spritePath,
+    hue: sprite.hue,
   }));
 
   // Auto mode timer
@@ -89,11 +91,43 @@ export default function Home() {
 
   // Step function to advance all marbles one step
   const stepMarbles = useCallback(() => {
-    setMarbles((currentMarbles) =>
-      currentMarbles.map((marble) =>
+    setMarbles((currentMarbles) => {
+      const newMarbles = currentMarbles.map((marble) =>
         updateMarbleStateMachine(marble, trackPieces)
-      )
-    );
+      );
+      
+      // Update track piece hues based on marble positions
+      setSprites((currentSprites) => {
+        return currentSprites.map((sprite) => {
+          // Find marbles that are rolling FROM this tile (previous position)
+          const marbleRollingFrom = newMarbles.find((newMarble) => {
+            const oldMarble = currentMarbles.find(m => m.id === newMarble.id);
+            if (!oldMarble || !newMarble.hue) return false;
+            
+            // Check if marble was on this tile and is now rolling
+            const wasOnThisTile = 
+              oldMarble.gridPosition.x === sprite.position.x && 
+              oldMarble.gridPosition.y === sprite.position.y;
+            const isNowRolling = newMarble.state === "rolling";
+            
+            if (wasOnThisTile && isNowRolling) {
+              console.log(`Marble ${newMarble.id} rolling from tile at (${sprite.position.x}, ${sprite.position.y}) with hue ${newMarble.hue}`);
+              return true;
+            }
+            return false;
+          });
+          
+          if (marbleRollingFrom && marbleRollingFrom.hue !== undefined) {
+            // Update sprite hue to marble's hue
+            return { ...sprite, hue: marbleRollingFrom.hue };
+          }
+          
+          return sprite;
+        });
+      });
+      
+      return newMarbles;
+    });
   }, [trackPieces]);
 
   const handleGridClick = (gridPos: GridPosition) => {
@@ -237,6 +271,18 @@ export default function Home() {
                 disabled={marbles.length === 0}
               >
                 Clear Marbles ({marbles.length})
+              </button>
+
+              <button
+                onClick={() => {
+                  setSprites((sprites) =>
+                    sprites.map((sprite) => ({ ...sprite, hue: undefined }))
+                  );
+                }}
+                className="px-3 py-1 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={sprites.length === 0}
+              >
+                Reset Colors
               </button>
 
               <button

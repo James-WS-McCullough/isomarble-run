@@ -13,6 +13,7 @@ interface IsometricSpriteProps {
   config: IsometricGridConfig;
   alt?: string;
   className?: string;
+  hueShift?: number; // Hue shift in degrees (0-360)
   onClick?: (gridPos: GridPosition) => void;
 }
 
@@ -25,6 +26,7 @@ export const IsometricSprite: React.FC<IsometricSpriteProps> = ({
   config,
   alt = "Isometric sprite",
   className = "",
+  hueShift = 0,
   onClick,
 }) => {
   const screenPos = getSpritePlacement(gridPosition, config);
@@ -56,6 +58,8 @@ export const IsometricSprite: React.FC<IsometricSpriteProps> = ({
         zIndex: zIndex,
         position: "absolute",
         boxSizing: "border-box",
+        filter: hueShift !== 0 ? `hue-rotate(${hueShift}deg)` : undefined,
+        transition: "filter 0.8s ease-in-out", // Smooth hue transition
       }}
       onClick={handleClick}
     />
