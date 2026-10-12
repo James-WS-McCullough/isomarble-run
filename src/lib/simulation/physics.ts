@@ -28,8 +28,6 @@ export const PHYSICS = {
    * clear two tiles up comfortably and drop onto them from above
    */
   FAN_KICK: 10,
-  /** Empty cells a fan's air can cross to suck marbles up a tube above it */
-  FAN_REACH: 2,
   /**
    * Sideways speed of a marble that rolled onto a fan as it's kicked up:
    * always the same, so it lands about one tile on, two tiles up

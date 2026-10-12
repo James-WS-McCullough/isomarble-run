@@ -64,6 +64,30 @@ export function restHeight(kind: PieceKind): number {
 export const REST_HEIGHTS = [GROOVE_REST_HEIGHT, FLAT_REST_HEIGHT];
 
 /**
+ * How many empty cells a fan's air crosses to reach a tube above it. Marbles
+ * it kicks up into that tube get sucked up the column.
+ */
+export const FAN_REACH = 2;
+
+/** A stack of tube pieces (tubes, outlets and funnels) */
+export interface TubeColumn {
+  x: number;
+  y: number;
+  /** Levels of its lowest and highest pieces */
+  bottom: number;
+  top: number;
+  /**
+   * Whether an outlet tops it off. That's an elbow, so whatever rises up
+   * the column leaves through its spout rather than out of the top.
+   */
+  capped: boolean;
+  /** The piece right under its bottom, if any */
+  base: Piece | undefined;
+  /** The fan blowing up it: right under it, or below a gap its air crosses */
+  fan: Piece | undefined;
+}
+
+/**
  * Fast lookups over the pieces of a track for the simulation.
  *
  * Pieces are grouped by where they appear on screen, because the
@@ -119,6 +143,54 @@ export class TrackIndex {
 
   isOccupied(cell: Cell): boolean {
     return this.byCell.has(cellKey(cell));
+  }
+
+  /** Whether there's a tube, outlet or funnel in a cell */
+  isTubeAt(cell: Cell): boolean {
+    const piece = this.pieceAt(cell);
+    return piece !== undefined && isTube(piece.kind);
+  }
+
+  /** The column of tubes with a tube in the given cell, if there is one */
+  tubeColumn(cell: Cell): TubeColumn | undefined {
+    const { x, y, z } = cell;
+    if (!this.isTubeAt(cell)) return undefined;
+    let bottom = z;
+    while (this.isTubeAt({ x, y, z: bottom - 1 })) bottom--;
+    let top = z;
+    while (this.isTubeAt({ x, y, z: top + 1 })) top++;
+
+    const base = this.pieceAt({ x, y, z: bottom - 1 });
+    let fan = base?.kind === "fan" ? base : undefined;
+    for (let gap = 1; !base && gap <= FAN_REACH; gap++) {
+      const below = this.pieceAt({ x, y, z: bottom - 1 - gap });
+      if (!below) continue;
+      if (below.kind === "fan") fan = below;
+      break;
+    }
+
+    return {
+      x,
+      y,
+      bottom,
+      top,
+      capped: this.pieceAt({ x, y, z: top })?.kind === "outlet",
+      base,
+      fan,
+    };
+  }
+
+  /**
+   * The first piece above a fan that its air reaches: right on top of it,
+   * or across up to FAN_REACH empty cells
+   */
+  reachedByFan(fan: Piece): Piece | undefined {
+    const { x, y, z } = fan.cell;
+    for (let level = z + 1; level <= z + 1 + FAN_REACH; level++) {
+      const piece = this.pieceAt({ x, y, z: level });
+      if (piece) return piece;
+    }
+    return undefined;
   }
 
   /**

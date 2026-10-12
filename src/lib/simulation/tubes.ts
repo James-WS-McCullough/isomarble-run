@@ -24,16 +24,6 @@ import { clamp } from "./vector";
  */
 const FUNNEL_REACH = MARBLE_RADIUS + 0.05;
 
-/** Whether there's a tube (or outlet) at this height in a column */
-function tubeAt(
-  track: TrackIndex,
-  column: { x: number; y: number },
-  z: number,
-): boolean {
-  const piece = track.pieceAt({ x: column.x, y: column.y, z });
-  return piece !== undefined && isTube(piece.kind);
-}
-
 /**
  * Which tube in a column a marble at height `z` is inside, or null.
  * Marbles enter and leave tubes level with the track, a little above the
@@ -45,10 +35,12 @@ export function tubeCell(
   z: number,
 ): number | null {
   const cell = Math.round(z);
-  if (tubeAt(track, column, cell)) return cell;
-  if (tubeAt(track, column, cell - 1) && z < cell - 0.5 + 0.1) return cell - 1;
+  const tubeAt = (level: number) =>
+    track.isTubeAt({ x: column.x, y: column.y, z: level });
+  if (tubeAt(cell)) return cell;
+  if (tubeAt(cell - 1) && z < cell - 0.5 + 0.1) return cell - 1;
   // Just touching the bottom of a column counts as inside it
-  if (tubeAt(track, column, cell + 1) && z >= cell + 0.5 - FUNNEL_REACH) {
+  if (tubeAt(cell + 1) && z >= cell + 0.5 - FUNNEL_REACH) {
     return cell + 1;
   }
   return null;
@@ -128,33 +120,27 @@ function swirl(
 export function stepInTube(
   track: TrackIndex,
   marble: Marble,
-  column: InTube,
+  tube: InTube,
   dt: number,
   events: SimulationEvent[],
 ): Landing | null {
   const z = marble.position.z;
-  const cell = tubeCell(track, column, z);
-  if (cell === null) {
+  const cell = tubeCell(track, tube, z);
+  const column =
+    cell === null
+      ? undefined
+      : track.tubeColumn({ x: tube.x, y: tube.y, z: cell });
+  if (cell === null || !column) {
     marble.motion = FLYING;
     return null;
   }
-
-  let bottom = cell;
-  while (tubeAt(track, column, bottom - 1)) bottom--;
-  let top = cell;
-  while (tubeAt(track, column, top + 1)) top++;
-  const base = track.pieceAt({
-    x: column.x,
-    y: column.y,
-    z: bottom - 1,
-  });
+  const { bottom, top, base } = column;
   // A fan blows up the column from right below it, or sucks marbles up it
   // from across a gap
-  const blown =
-    base?.kind === "fan" || (!base && fanAcrossGap(track, column, bottom));
+  const blown = column.fan !== undefined;
 
   const v = marble.velocity;
-  if (blown && !column.sinking) {
+  if (blown && !tube.sinking) {
     const change = clamp(
       PHYSICS.AIR_SPEED - v.z,
       -PHYSICS.AIR_ACCELERATION * dt,
@@ -165,20 +151,20 @@ export function stepInTube(
     v.z = Math.max(v.z - PHYSICS.GRAVITY * dt, -PHYSICS.MAX_SPEED);
   }
   // Rolling round the cone of a funnel holds it back
-  const circling = column.offset.x !== 0 || column.offset.y !== 0;
+  const circling = tube.offset.x !== 0 || tube.offset.y !== 0;
   if (circling) {
     v.z = clamp(v.z, -FUNNEL.SWIRL_VERTICAL, FUNNEL.SWIRL_VERTICAL);
   }
   let after = z + v.z * dt;
-  swirl(track, column, cell, after, dt);
+  swirl(track, tube, cell, after, dt);
 
   if (v.z > 0) {
     // Out of the spout of an outlet it rises past. The spout is a little
     // above the outlet's centre, so check the cell below too.
     for (let level = cell - 1; level <= Math.round(after); level++) {
       const piece = track.pieceAt({
-        x: column.x,
-        y: column.y,
+        x: tube.x,
+        y: tube.y,
         z: level,
       });
       const spout = level + GROOVE_REST_HEIGHT;
@@ -189,9 +175,7 @@ export function stepInTube(
     }
     // Out of the open top of the column, to fall back in (an outlet at
     // the top is an elbow, so marbles leave through its spout instead)
-    const capped =
-      track.pieceAt({ x: column.x, y: column.y, z: top })?.kind === "outlet";
-    if (!capped && after > top + 0.5) {
+    if (!column.capped && after > top + 0.5) {
       marble.motion = FLYING;
       marble.headingForward = true;
     }
@@ -199,7 +183,7 @@ export function stepInTube(
     // Dropping out of the bottom onto the piece below
     const landing = bottom - 1 + restHeight(base.kind);
     if (after <= landing) {
-      return { piece: base, point: { x: column.x, y: column.y, z: landing } };
+      return { piece: base, point: { x: tube.x, y: tube.y, z: landing } };
     }
   } else if (base && blown) {
     // The fan keeps it from dropping into the fan itself, and blows it
@@ -207,7 +191,7 @@ export function stepInTube(
     const floor = bottom - 0.5 + MARBLE_RADIUS;
     if (after <= floor) {
       after = floor;
-      column.sinking = false;
+      tube.sinking = false;
       v.z = Math.max(v.z, 0);
     }
   } else if (after < bottom - 0.5) {
@@ -217,28 +201,11 @@ export function stepInTube(
   }
 
   rollTo(marble, {
-    x: column.x + column.offset.x,
-    y: column.y + column.offset.y,
+    x: tube.x + tube.offset.x,
+    y: tube.y + tube.offset.y,
     z: after,
   });
   return null;
-}
-
-/** Whether there's a fan below a column, across a few empty cells */
-function fanAcrossGap(
-  track: TrackIndex,
-  column: { x: number; y: number },
-  bottom: number,
-) {
-  for (let gap = 1; gap <= PHYSICS.FAN_REACH; gap++) {
-    const below = track.pieceAt({
-      x: column.x,
-      y: column.y,
-      z: bottom - 1 - gap,
-    });
-    if (below) return below.kind === "fan";
-  }
-  return false;
 }
 
 /**
@@ -287,7 +254,7 @@ export function catchFromBelow(
   const piece = track.pieceAt({ x, y, z: level });
   if (!piece || !isTube(piece.kind)) return false;
   // Already inside the column, rising through it
-  if (tubeAt(track, { x, y }, level - 1)) return false;
+  if (track.isTubeAt({ x, y, z: level - 1 })) return false;
   const mouth = level - 0.5 - FUNNEL_REACH;
   if (before.z >= mouth || after.z < mouth) return false;
   enterTube(marble, piece, mouth, marble.velocity.z, {

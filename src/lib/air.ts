@@ -1,6 +1,4 @@
 import { FAN_WELL } from "./grooves";
-import { isTube } from "./pieces";
-import { PHYSICS } from "./simulation";
 import { GROOVE_REST_HEIGHT } from "./space";
 import type { TrackIndex } from "./track";
 
@@ -19,38 +17,28 @@ export interface AirStream {
 }
 
 /**
- * The air rising from each fan: up through open air, or sucked all the way
- * up a tube column within reach above it, as marbles are
+ * The air rising from each fan: up through open air, stopped by a solid
+ * piece, or sucked all the way up a tube column within its reach, just as
+ * marbles are
  */
 export function airStreams(track: TrackIndex): AirStream[] {
   const streams: AirStream[] = [];
   for (const fan of track.pieces) {
     if (fan.kind !== "fan") continue;
     const { x, y, z } = fan.cell;
-    const tubeAt = (level: number) => {
-      const piece = track.pieceAt({ x, y, z: level });
-      return piece !== undefined && isTube(piece.kind);
-    };
+    const from = z + 0.5 - FAN_WELL.DEPTH;
+    const reached = track.reachedByFan(fan);
+    const column = reached && track.tubeColumn({ x, y, z: reached.cell.z });
 
-    let to = z + 0.5 + OPEN_AIR_RISE;
-    let tubeFrom: number | null = null;
-    for (let level = z + 1; level <= z + 1 + PHYSICS.FAN_REACH; level++) {
-      const piece = track.pieceAt({ x, y, z: level });
-      if (!piece) continue;
-      if (isTube(piece.kind)) {
-        let top = level;
-        while (tubeAt(top + 1)) top++;
-        // An outlet at the top is capped: the air leaves through its spout
-        const capped = track.pieceAt({ x, y, z: top })?.kind === "outlet";
-        to = top + (capped ? GROOVE_REST_HEIGHT : 0.5);
-        tubeFrom = level - 0.5;
-      } else {
-        // Blocked by a solid piece
-        to = level - 0.5;
-      }
-      break;
+    if (column) {
+      // Up the column and out of its top, or its spout if an outlet caps it
+      const to = column.top + (column.capped ? GROOVE_REST_HEIGHT : 0.5);
+      streams.push({ x, y, from, to, tubeFrom: column.bottom - 0.5 });
+    } else if (reached) {
+      streams.push({ x, y, from, to: reached.cell.z - 0.5, tubeFrom: null });
+    } else {
+      streams.push({ x, y, from, to: z + 0.5 + OPEN_AIR_RISE, tubeFrom: null });
     }
-    streams.push({ x, y, from: z + 0.5 - FAN_WELL.DEPTH, to, tubeFrom });
   }
   return streams;
 }
