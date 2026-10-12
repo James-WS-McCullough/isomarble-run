@@ -17,7 +17,6 @@ interface PieceMeshProps {
   kind: PieceKind;
   rotation: number;
   cell: Cell;
-  hue?: number;
   look?: PieceLook;
   /** Piece id, so pointer events can tell which piece was hit */
   pieceId?: string;
@@ -31,7 +30,6 @@ export interface ModelProps {
   pieceId?: string;
   /** Quarter turns: the model is already turned, but some flip too */
   rotation: number;
-  hue?: number;
   look: PieceLook;
   raycast?: () => null;
 }
@@ -54,7 +52,6 @@ export function PieceMesh({
   kind,
   rotation,
   cell,
-  hue,
   look = "normal",
   pieceId,
   pickable = true,
@@ -73,7 +70,6 @@ export function PieceMesh({
         <Model
           pieceId={pieceId}
           rotation={rotation}
-          hue={hue}
           look={look}
           raycast={raycast}
         />
@@ -82,7 +78,7 @@ export function PieceMesh({
   }
 
   const geometry = getPieceGeometry(kind);
-  const material = getPieceMaterial(hue, look);
+  const material = getPieceMaterial(look);
 
   return (
     <group {...placement}>

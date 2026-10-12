@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { isUpsideDown, orientations } from "./pieces";
 import { decodePieces } from "./saves";
 import { motionAs, Simulation, type SimulationEvent } from "./simulation";
-import { painted, run } from "./testing";
+import { run, visited } from "./testing";
 import { createPiece, TrackIndex } from "./track";
 
 describe("tubes and fans", () => {
@@ -23,7 +23,7 @@ describe("tubes and fans", () => {
       inTube ||= motionAs(marble, "tube") !== null;
     }
     expect(inTube).toBe(true);
-    expect(painted(events, pieces)).toContain("straight@0,0,0");
+    expect(visited(events, pieces)).toContain("straight@0,0,0");
   });
 
   it("blows a marble up from a fan's intake and out of an outlet", () => {
@@ -48,7 +48,7 @@ describe("tubes and fans", () => {
       events.push(...sim.advance(1 / 60));
       highest = Math.max(highest, marble.position.z);
     }
-    const route = painted(events, pieces);
+    const route = visited(events, pieces);
     expect(route.slice(0, 5)).toEqual([
       "straight@-2,0,0",
       "straight@-1,0,0",
@@ -72,7 +72,7 @@ describe("tubes and fans", () => {
     sim.setPieces(pieces);
     sim.addMarble({ x: 2, y: 0, z: 3.2 });
 
-    const route = painted(run(sim, 3), pieces);
+    const route = visited(run(sim, 3), pieces);
     expect(route.slice(0, 4)).toEqual([
       "straight@2,0,2",
       "straight@1,0,2",
@@ -113,8 +113,12 @@ describe("upside-down outlets", () => {
     const sim = new Simulation(() => 0);
     sim.setPieces(pieces);
     sim.addMarble({ x: 0, y: 0, z: 4.2 });
-    const route = painted(run(sim, 3), pieces);
-    expect(route.slice(0, 2)).toEqual(["outlet@0,0,1", "straight@1,0,0"]);
+    const route = visited(run(sim, 3), pieces);
+    expect(route.slice(0, 3)).toEqual([
+      "funnel@0,0,3",
+      "outlet@0,0,1",
+      "straight@1,0,0",
+    ]);
   });
 
   it("joins the track a level down", () => {

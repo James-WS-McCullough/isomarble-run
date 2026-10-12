@@ -1,44 +1,26 @@
 import * as THREE from "three";
-import { createSwirlTexture, createWoodTexture } from "./textures";
+import type { MarbleLook } from "@/lib/simulation";
+import { createMarbleTexture, createWoodTexture } from "./textures";
 
-/**
- * Shared materials. Pieces are tinted by the colour last painted onto them,
- * so materials are cached per tint rather than created per piece.
- */
+/** Shared materials, cached rather than created per piece or marble */
 
 let woodTexture: THREE.Texture | null = null;
-let swirlTexture: THREE.Texture | null = null;
 
 function wood(): THREE.Texture {
   woodTexture ??= createWoodTexture();
   return woodTexture;
 }
 
-export function swirl(): THREE.Texture {
-  swirlTexture ??= createSwirlTexture();
-  return swirlTexture;
-}
-
 export type PieceLook = "normal" | "highlight" | "ghost" | "blocked";
 
-const cache = new Map<string, THREE.Material>();
-
-/** How strongly a painted colour stains the wood */
-const STAIN = 0.55;
+const cache = new Map<PieceLook, THREE.Material>();
 
 /** Wood for a piece; vertex colours on the geometry darken the grooves */
-export function getPieceMaterial(
-  hue: number | undefined,
-  look: PieceLook,
-): THREE.Material {
-  const key = `${hue ?? "none"}-${look}`;
-  const cached = cache.get(key);
+export function getPieceMaterial(look: PieceLook): THREE.Material {
+  const cached = cache.get(look);
   if (cached) return cached;
 
   const tint = new THREE.Color(1, 1, 1);
-  if (hue !== undefined) {
-    tint.lerp(new THREE.Color().setHSL(hue / 360, 0.75, 0.55), STAIN);
-  }
   if (look === "blocked") tint.set("#ff6b6b");
 
   const material = new THREE.MeshStandardMaterial({
@@ -58,7 +40,25 @@ export function getPieceMaterial(
     material.emissiveIntensity = 0.25;
   }
 
-  cache.set(key, material);
+  cache.set(look, material);
+  return material;
+}
+
+const marbleCache = new Map<string, THREE.Material>();
+
+/** Polished glass in a marble's colour and design */
+export function getMarbleMaterial(look: MarbleLook): THREE.Material {
+  const key = `${look.pattern}-${Math.round(look.hue)}`;
+  let material = marbleCache.get(key);
+  if (!material) {
+    material = new THREE.MeshPhysicalMaterial({
+      map: createMarbleTexture(look),
+      roughness: 0.08,
+      clearcoat: 1,
+      clearcoatRoughness: 0.05,
+    });
+    marbleCache.set(key, material);
+  }
   return material;
 }
 

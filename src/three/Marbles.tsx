@@ -5,7 +5,7 @@ import { useMemo, useRef } from "react";
 import * as THREE from "three";
 import type { Simulation } from "@/lib/simulation";
 import { MARBLE_RADIUS } from "@/lib/space";
-import { swirl } from "./materials";
+import { getMarbleMaterial } from "./materials";
 
 interface MarblesProps {
   simulation: Simulation;
@@ -17,8 +17,9 @@ const axis = new THREE.Vector3();
 const spin = new THREE.Quaternion();
 
 /**
- * Glass marbles. Positions come straight from the simulation every frame,
- * and each marble spins by exactly the distance it rolled.
+ * Glass marbles, each in its own colour and design. Positions come straight
+ * from the simulation every frame, and each marble spins by exactly the
+ * distance it rolled.
  */
 export function Marbles({ simulation, marbleIds }: MarblesProps) {
   const meshes = useRef(new Map<string, THREE.Mesh>());
@@ -51,35 +52,27 @@ export function Marbles({ simulation, marbleIds }: MarblesProps) {
       }
       marble.rolled.x = 0;
       marble.rolled.y = 0;
-
-      const material = mesh.material as THREE.MeshPhysicalMaterial;
-      if (material.userData.hue !== marble.hue) {
-        material.color.setHSL(marble.hue / 360, 0.8, 0.55);
-        material.userData.hue = marble.hue;
-      }
     }
   });
 
   return (
     <>
-      {marbleIds.map((id) => (
-        <mesh
-          key={id}
-          ref={(mesh) => {
-            if (mesh) meshes.current.set(id, mesh);
-            else meshes.current.delete(id);
-          }}
-          geometry={geometry}
-          raycast={() => null}
-        >
-          <meshPhysicalMaterial
-            map={swirl()}
-            roughness={0.08}
-            clearcoat={1}
-            clearcoatRoughness={0.05}
+      {marbleIds.map((id) => {
+        const marble = simulation.marbles.find((m) => m.id === id);
+        if (!marble) return null;
+        return (
+          <mesh
+            key={id}
+            ref={(mesh) => {
+              if (mesh) meshes.current.set(id, mesh);
+              else meshes.current.delete(id);
+            }}
+            geometry={geometry}
+            material={getMarbleMaterial(marble.look)}
+            raycast={() => null}
           />
-        </mesh>
-      ))}
+        );
+      })}
     </>
   );
 }

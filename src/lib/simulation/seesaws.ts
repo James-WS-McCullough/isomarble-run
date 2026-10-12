@@ -1,7 +1,6 @@
 import { cupPosition, SEESAW, seesawAxis } from "../seesaw";
 import type { Piece } from "../track";
 import {
-  changeColour,
   FLYING,
   type Held,
   type Marble,
@@ -25,8 +24,6 @@ interface SeesawState {
  */
 export class Seesaws {
   private readonly states = new Map<string, SeesawState>();
-
-  constructor(private readonly random: () => number) {}
 
   /** How far a seesaw is tipped (radians; positive lowers its +1 end) */
   tilt(pieceId: string): number {
@@ -76,7 +73,7 @@ export class Seesaws {
     const side = Math.abs(along) < 0.1 ? state.down : Math.sign(along);
     const impact = Math.abs(marble.velocity.z);
     events.push({ type: "land", marbleId: marble.id, impact });
-    events.push({ type: "paint", pieceId: piece.id, hue: marble.hue });
+    events.push({ type: "visit", pieceId: piece.id, marbleId: marble.id });
 
     if (side === state.down && state.held) {
       // That cup's full: bounce off it
@@ -103,7 +100,6 @@ export class Seesaws {
           z: SEESAW.LAUNCH_UP,
         };
         waiting.headingForward = axis.x * out + axis.y * out > 0;
-        changeColour(waiting, this.random);
       }
     }
 

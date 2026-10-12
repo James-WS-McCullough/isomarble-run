@@ -18,7 +18,6 @@ interface SidebarProps {
   marbleCount: number;
   pieceCount: number;
   onClearMarbles: () => void;
-  onResetColours: () => void;
   canUndo: boolean;
   canRedo: boolean;
   onUndo: () => void;
@@ -102,7 +101,7 @@ export function Sidebar(props: SidebarProps) {
           />
           <span className="w-8 text-right tabular-nums">{props.speed}×</span>
         </label>
-        <div className="grid grid-cols-2 gap-1 mt-2">
+        <div className="grid gap-1 mt-2">
           <button
             type="button"
             onClick={props.onClearMarbles}
@@ -110,14 +109,6 @@ export function Sidebar(props: SidebarProps) {
             className={`${button} bg-stone-700 hover:bg-stone-600`}
           >
             Clear marbles
-          </button>
-          <button
-            type="button"
-            onClick={props.onResetColours}
-            disabled={props.pieceCount === 0}
-            className={`${button} bg-stone-700 hover:bg-stone-600`}
-          >
-            Reset colours
           </button>
         </div>
       </Section>

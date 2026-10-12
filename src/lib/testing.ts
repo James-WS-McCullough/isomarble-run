@@ -15,19 +15,19 @@ export function runUntil(sim: Simulation, done: () => boolean, seconds = 10) {
   for (let t = 0; t < seconds && !done(); t += 1 / 60) sim.advance(1 / 60);
 }
 
-/** Ids of the pieces marbles painted, in order */
-export function paintedIds(events: SimulationEvent[]): string[] {
+/** Ids of the pieces marbles visited, in order */
+export function visitedIds(events: SimulationEvent[]): string[] {
   return events.flatMap((event) =>
-    event.type === "paint" ? [event.pieceId] : [],
+    event.type === "visit" ? [event.pieceId] : [],
   );
 }
 
-/** The pieces marbles painted, in order, named like "straight@1,0,2" */
-export function painted(events: SimulationEvent[], pieces: Piece[]): string[] {
+/** The pieces marbles visited, in order, named like "straight@1,0,2" */
+export function visited(events: SimulationEvent[], pieces: Piece[]): string[] {
   const names = new Map(
     pieces.map((p) => [p.id, `${p.kind}@${p.cell.x},${p.cell.y},${p.cell.z}`]),
   );
-  return paintedIds(events).map((id) => names.get(id) ?? "?");
+  return visitedIds(events).map((id) => names.get(id) ?? "?");
 }
 
 /** Random numbers from a list, then 0.5 forever */

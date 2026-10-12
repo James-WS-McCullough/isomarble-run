@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { motionAs, Simulation, type SimulationEvent } from "./simulation";
-import { painted } from "./testing";
+import { visited } from "./testing";
 import { createPiece } from "./track";
 
 describe("funnels", () => {
@@ -36,7 +36,7 @@ describe("funnels", () => {
     }
     // It went round the funnel before dropping down onto the track
     expect(circled).toBeGreaterThan(Math.PI / 2);
-    expect(painted(events, pieces)).toContain("straight@0,0,0");
+    expect(visited(events, pieces)).toContain("straight@0,0,0");
   });
 
   it("feeds a fan's tube, which blows the marble out of an outlet", () => {
@@ -62,7 +62,7 @@ describe("funnels", () => {
     }
     // Down past the outlet to the fan, then back up and out of the spout
     expect(lowest).toBeLessThan(1);
-    expect(painted(events, pieces)).toContain("straight@1,0,2");
+    expect(visited(events, pieces)).toContain("straight@1,0,2");
   });
 
   it("takes a marble rolling in over its rim", () => {

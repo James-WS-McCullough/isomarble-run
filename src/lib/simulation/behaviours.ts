@@ -63,6 +63,11 @@ const intoTheTop: PieceBehaviour["land"] = (
     landing.point,
   );
   events.push({ type: "land", marbleId: marble.id, impact: Math.abs(v.z) / 3 });
+  events.push({
+    type: "visit",
+    pieceId: landing.piece.id,
+    marbleId: marble.id,
+  });
 };
 
 export const BEHAVIOURS: Partial<Record<PieceKind, PieceBehaviour>> = {
@@ -108,7 +113,7 @@ export const BEHAVIOURS: Partial<Record<PieceKind, PieceBehaviour>> = {
         return false;
       }
       enterTube(marble, piece, piece.cell.z + restHeight(piece.kind), -0.5);
-      events.push({ type: "paint", pieceId: piece.id, hue: marble.hue });
+      events.push({ type: "visit", pieceId: piece.id, marbleId: marble.id });
       return true;
     },
   },
@@ -122,7 +127,7 @@ export const BEHAVIOURS: Partial<Record<PieceKind, PieceBehaviour>> = {
       carryOn(marble, arriving);
       const rim = entryPoint(piece, arriving);
       enterTube(marble, piece, rim.z, -0.01, rim);
-      events.push({ type: "paint", pieceId: piece.id, hue: marble.hue });
+      events.push({ type: "visit", pieceId: piece.id, marbleId: marble.id });
       return true;
     },
   },

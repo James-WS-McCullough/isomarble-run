@@ -53,10 +53,28 @@ export interface Held {
 
 export const FLYING: Flying = { mode: "flying" };
 
+/** The designs marbles come in */
+export const MARBLE_PATTERNS = [
+  "swirl",
+  "catsEye",
+  "beachBall",
+  "galaxy",
+  "twoTone",
+  "polkaDot",
+] as const;
+
+export type MarblePattern = (typeof MARBLE_PATTERNS)[number];
+
+/** How a marble looks. It keeps the same look all its life. */
+export interface MarbleLook {
+  /** Its main colour (0-360) */
+  hue: number;
+  pattern: MarblePattern;
+}
+
 export interface Marble {
   id: string;
-  /** Colour (0-360), painted onto pieces the marble rolls over */
-  hue: number;
+  look: MarbleLook;
   position: Vec3;
   motion: Motion;
   /** Velocity while flying (only its upward part counts inside a tube) */
@@ -76,7 +94,8 @@ export interface Marble {
 
 export type SimulationEvent =
   | { type: "land"; marbleId: string; impact: number }
-  | { type: "paint"; pieceId: string; hue: number }
+  /** A marble arrived on a piece, rolling or dropping in */
+  | { type: "visit"; pieceId: string; marbleId: string }
   | { type: "hit"; impact: number }
   | { type: "removed"; marbleId: string };
 
@@ -110,9 +129,4 @@ export function snapTo(marble: Marble, point: Vec3) {
   const jump = visiblePart(subtract(marble.position, point));
   marble.visualOffset = add(marble.visualOffset, jump);
   marble.position = point;
-}
-
-/** Marbles change colour each time they set off on a new fall */
-export function changeColour(marble: Marble, random: () => number) {
-  marble.hue = (marble.hue + 30 + Math.floor(random() * 111)) % 360;
 }

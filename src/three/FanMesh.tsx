@@ -46,7 +46,7 @@ const brassMaterial = new THREE.MeshStandardMaterial({
 });
 
 /** A wooden crossroads with a spinning fan set into the middle */
-export function Fan({ hue, look, raycast }: ModelProps) {
+export function Fan({ look, raycast }: ModelProps) {
   const block = getPieceGeometry("fan");
   const blades = useRef<THREE.Group>(null);
   useFrame((_, delta) => {
@@ -57,7 +57,7 @@ export function Fan({ hue, look, raycast }: ModelProps) {
     <>
       <mesh
         geometry={block.solid}
-        material={getPieceMaterial(hue, look)}
+        material={getPieceMaterial(look)}
         raycast={raycast}
       />
       <lineSegments

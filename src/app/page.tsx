@@ -34,7 +34,6 @@ export default function Home() {
   const [simulation] = useState(() => new Simulation());
   const [sound] = useState(() => new SoundEngine());
   const [marbleIds, setMarbleIds] = useState<string[]>([]);
-  const [paint, setPaint] = useState<Record<string, number>>({});
   const [playing, setPlaying] = useState(true);
   const [speed, setSpeed] = useState(1);
   const [soundEnabled, setSoundEnabled] = useState(false);
@@ -123,7 +122,6 @@ export default function Home() {
     editor.loadTrack(decodePieces(run.pieces));
     setCurrentSaveId(run.id);
     clearMarbles();
-    setPaint({});
     setDialog(null);
     flash(`Opened "${run.name}"`);
   };
@@ -152,17 +150,12 @@ export default function Home() {
     sound.update(simulation.marbles);
     if (events.length === 0) return;
 
-    const painted: Record<string, number> = {};
     const removed = new Set<string>();
     for (const event of events) {
-      if (event.type === "paint") painted[event.pieceId] = event.hue;
-      else if (event.type === "removed") removed.add(event.marbleId);
+      if (event.type === "removed") removed.add(event.marbleId);
       else if (event.type === "land" || event.type === "hit") {
         sound.tap(event.impact);
       }
-    }
-    if (Object.keys(painted).length > 0) {
-      setPaint((current) => ({ ...current, ...painted }));
     }
     if (removed.size > 0) {
       setMarbleIds((ids) => ids.filter((id) => !removed.has(id)));
@@ -198,7 +191,6 @@ export default function Home() {
         marbleCount={marbleIds.length}
         pieceCount={editor.pieces.length}
         onClearMarbles={clearMarbles}
-        onResetColours={() => setPaint({})}
         canUndo={editor.canUndo}
         canRedo={editor.canRedo}
         onUndo={editor.undo}
@@ -214,7 +206,6 @@ export default function Home() {
         <Board
           simulation={simulation}
           pieces={editor.displayedPieces}
-          paint={paint}
           marbleIds={marbleIds}
           playing={playing}
           speed={speed}

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { PieceKind } from "./pieces";
 import { motionAs, Simulation, type SimulationEvent } from "./simulation";
 import type { Cell } from "./space";
-import { painted } from "./testing";
+import { visited } from "./testing";
 import { createPiece } from "./track";
 
 describe("fans", () => {
@@ -58,7 +58,7 @@ describe("fans", () => {
         inTube ||= motionAs(marble, "tube") !== null;
       }
       expect(inTube).toBe(true);
-      expect(painted(events, pieces)).toContain(`straight@1,0,${3 + up}`);
+      expect(visited(events, pieces)).toContain(`straight@1,0,${3 + up}`);
     });
   }
 
@@ -94,7 +94,7 @@ describe("fans", () => {
           const events: SimulationEvent[] = [];
           for (let i = 0; i < 180; i++) events.push(...sim.advance(1 / 60));
           expect(
-            events.some((e) => e.type === "paint" && e.pieceId === after.id),
+            events.some((e) => e.type === "visit" && e.pieceId === after.id),
           ).toBe(true);
         }
       }

@@ -240,7 +240,7 @@ export function blowUp(
   events: SimulationEvent[],
 ) {
   const { x, y, z } = fan.cell;
-  events.push({ type: "paint", pieceId: fan.id, hue: marble.hue });
+  events.push({ type: "visit", pieceId: fan.id, marbleId: marble.id });
   const above = track.pieceAt({ x, y, z: z + 1 });
   if (above && isTube(above.kind)) {
     enterTube(marble, above, z + restHeight(fan.kind), PHYSICS.AIR_SPEED, from);
@@ -307,5 +307,5 @@ function leaveThroughSpout(
     exit,
     entry: null,
   };
-  events.push({ type: "paint", pieceId: outlet.id, hue: marble.hue });
+  events.push({ type: "visit", pieceId: outlet.id, marbleId: marble.id });
 }

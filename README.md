@@ -1,6 +1,6 @@
 # Isomarble Run
 
-An isometric wooden marble run where impossible tracks work. Build a run out of wooden pieces, drop in some glass marbles, and watch them roll, fall and stain the wood their colour. Pieces that only *look* connected really are connected, so you can build Escher-style loops that go downhill forever.
+An isometric wooden marble run where impossible tracks work. Build a run out of wooden pieces, drop in some glass marbles, and watch them roll and fall. Pieces that only *look* connected really are connected, so you can build Escher-style loops that go downhill forever.
 
 **Play it:** https://james-ws-mccullough.github.io/isomarble-run/
 
@@ -69,7 +69,7 @@ The world is a real 3D grid (x and y across, z up), drawn with a true isometric 
 - **Speed is real too, within limits.** Falls speed marbles up, friction slows them back down to a gentle cruising speed on the flat, curves scrub off a little speed, and catchers bounce marbles back. Falling speed is capped, so endless loops settle into a steady pace.
 - **Grooves are rounded channels.** The 3D models and the physics share one groove shape, so marbles sit snugly in the bottom of the groove, roll down into it if they land on the edge, and bounce off the side of a piece that has no opening. Catchers have a wide round bowl with an exit groove, so they catch marbles that land near their edge. Marbles rolling across flat blocks are level with the tops of other pieces, so they roll over the rim into a groove or bowl instead of bouncing off.
 - **Marbles bump into each other.** They collide when they visibly touch, either really touching in 3D or rolling on track that visibly joins (even across a hidden change of depth). Marbles that only overlap because one is passing in front of the other don't collide. A marble on track keeps the part of a bump that runs along its groove, so a head-on hit sends it back the way it came.
-- Marbles that fall off the bottom of the board come back in at the top. Each marble stains the pieces it rolls over and changes colour every time it starts a new fall.
+- Marbles that fall off the bottom of the board come back in at the top. Each marble keeps its own colour and design (swirl, cat's eye, beach ball, galaxy, two-tone or polka dot), so you can follow it round the run.
 
 Everything is drawn with [three.js](https://threejs.org) via [React Three Fiber](https://r3f.docs.pmnd.rs). The wood and marble textures are generated in code, so there are no image files to download.
 

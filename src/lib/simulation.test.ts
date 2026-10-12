@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { pieceExits } from "./pieces";
-import { motionAs, PHYSICS, Simulation } from "./simulation";
+import { MARBLE_PATTERNS, motionAs, PHYSICS, Simulation } from "./simulation";
 import { screenOf } from "./space";
-import { paintedIds, run } from "./testing";
+import { run, visitedIds } from "./testing";
 import { createPiece, TrackIndex } from "./track";
 
 /** A point on screen just above a piece's top face */
@@ -79,7 +79,7 @@ describe("Simulation", () => {
 
     const events = run(sim, 3);
     expect(events.some((event) => event.type === "land")).toBe(true);
-    expect(paintedIds(events).slice(0, 4)).toEqual(row.map((p) => p.id));
+    expect(visitedIds(events).slice(0, 4)).toEqual(row.map((p) => p.id));
   });
 
   it("rolls across pieces that only look connected", () => {
@@ -89,8 +89,8 @@ describe("Simulation", () => {
     sim.setPieces([lower, upper]);
     sim.addMarble(above(lower.cell));
 
-    const painted = paintedIds(run(sim, 1.5));
-    expect(painted.slice(0, 2)).toEqual([lower.id, upper.id]);
+    const visited = visitedIds(run(sim, 1.5));
+    expect(visited.slice(0, 2)).toEqual([lower.id, upper.id]);
   });
 
   it("falling towards the camera, lands on a piece that looks below it", () => {
@@ -104,9 +104,9 @@ describe("Simulation", () => {
     sim.setPieces([start, ...front]);
     sim.addMarble(above(start.cell));
 
-    const painted = paintedIds(run(sim, 1.5));
-    expect(painted[0]).toBe(start.id);
-    expect(front.map((p) => p.id)).toContain(painted[1]);
+    const visited = visitedIds(run(sim, 1.5));
+    expect(visited[0]).toBe(start.id);
+    expect(front.map((p) => p.id)).toContain(visited[1]);
   });
 
   it("drops behind a piece that is in front of it instead of landing on it", () => {
@@ -121,10 +121,10 @@ describe("Simulation", () => {
     sim.setPieces([start, ...floor, inFront]);
     sim.addMarble(above(start.cell));
 
-    const painted = paintedIds(run(sim, 1.2));
-    expect(painted[0]).toBe(start.id);
-    expect(painted).not.toContain(inFront.id);
-    expect(floor.map((p) => p.id)).toContain(painted[1]);
+    const visited = visitedIds(run(sim, 1.2));
+    expect(visited[0]).toBe(start.id);
+    expect(visited).not.toContain(inFront.id);
+    expect(floor.map((p) => p.id)).toContain(visited[1]);
   });
 
   it("lands in a catcher it visibly reaches, rather than clipping its back wall", () => {
@@ -137,7 +137,7 @@ describe("Simulation", () => {
     sim.setPieces([...row, catcher]);
     sim.addMarble(above(row[0].cell));
 
-    expect(paintedIds(run(sim, 3))).toContain(catcher.id);
+    expect(visitedIds(run(sim, 3))).toContain(catcher.id);
   });
 
   it("rolls off flat blocks over a catcher's rim and out of its exit", () => {
@@ -171,8 +171,8 @@ describe("Simulation", () => {
     sim.setPieces([start, ...wall, lower]);
     const marble = sim.addMarble(above(start.cell));
 
-    const painted = paintedIds(run(sim, 1.5));
-    expect(painted.slice(0, 2)).toEqual([start.id, lower.id]);
+    const visited = visitedIds(run(sim, 1.5));
+    expect(visited.slice(0, 2)).toEqual([start.id, lower.id]);
     expect(marble.position.x).toBeLessThan(1.5);
   });
 
@@ -183,8 +183,8 @@ describe("Simulation", () => {
     sim.setPieces([straight, catcher]);
     sim.addMarble(above(straight.cell));
 
-    const painted = paintedIds(run(sim, 2));
-    expect(painted.slice(0, 3)).toEqual([straight.id, catcher.id, straight.id]);
+    const visited = visitedIds(run(sim, 2));
+    expect(visited.slice(0, 3)).toEqual([straight.id, catcher.id, straight.id]);
   });
 
   it("bounces off the side of a piece with no opening there", () => {
@@ -196,16 +196,16 @@ describe("Simulation", () => {
     const marble = sim.addMarble(above(start.cell));
 
     let bouncedBack = false;
-    const painted: string[] = [];
+    const visited: string[] = [];
     for (let i = 0; i < 120; i++) {
-      painted.push(...paintedIds(sim.advance(1 / 60)));
+      visited.push(...visitedIds(sim.advance(1 / 60)));
       const rolling = motionAs(marble, "rolling");
       if (rolling?.piece === start && rolling.exit === "-x") {
         bouncedBack = true;
       }
     }
     expect(bouncedBack).toBe(true);
-    expect(painted).not.toContain(wall.id);
+    expect(visited).not.toContain(wall.id);
   });
 
   it("turns down a splitter's curved branch", () => {
@@ -276,5 +276,25 @@ describe("Simulation", () => {
 
     sim.setPieces([]);
     expect(motionAs(marble, "rolling")).toBeNull();
+  });
+});
+
+describe("marble looks", () => {
+  it("gives each marble a design, and colours far from the last one", () => {
+    const sim = new Simulation(() => 0.5);
+    const a = sim.addMarble({ x: 0, y: 0, z: 2 });
+    const b = sim.addMarble({ x: 0, y: 0, z: 2 });
+    const apart = Math.abs(a.look.hue - b.look.hue) % 360;
+    expect(Math.min(apart, 360 - apart)).toBeGreaterThan(90);
+    expect(MARBLE_PATTERNS).toContain(a.look.pattern);
+  });
+
+  it("keeps its look as it rolls off the end and falls", () => {
+    const sim = new Simulation(() => 0);
+    sim.setPieces([createPiece("straight", 0, { x: 0, y: 0, z: 0 })]);
+    const marble = sim.addMarble(above({ x: 0, y: 0, z: 0 }));
+    const look = { ...marble.look };
+    run(sim, 2);
+    expect(marble.look).toEqual(look);
   });
 });

@@ -29,7 +29,6 @@ export interface Ghost {
 interface BoardProps {
   simulation: Simulation;
   pieces: Piece[];
-  paint: Record<string, number>;
   marbleIds: string[];
   playing: boolean;
   speed: number;
@@ -105,7 +104,6 @@ export function Board(props: BoardProps) {
               kind={piece.kind}
               rotation={piece.rotation}
               cell={piece.cell}
-              hue={props.paint[piece.id]}
               look={piece.id === props.highlightedId ? "highlight" : "normal"}
               pickable={piece.id !== props.draggingId}
             />

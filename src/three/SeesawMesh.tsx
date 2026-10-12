@@ -56,11 +56,11 @@ const cupMaterial = new THREE.MeshStandardMaterial({
  * A cup seesaw, built along +x: a stand in the middle tile and a cup over
  * the tile at each end. It tips to follow the simulation.
  */
-export function Seesaw({ pieceId, hue, look, raycast }: ModelProps) {
+export function Seesaw({ pieceId, look, raycast }: ModelProps) {
   const simulation = useContext(SimulationContext);
   const beam = useRef<THREE.Group>(null);
   const block = getPieceGeometry("block");
-  const base = getPieceMaterial(hue, look);
+  const base = getPieceMaterial(look);
 
   useFrame(() => {
     if (!beam.current) return;

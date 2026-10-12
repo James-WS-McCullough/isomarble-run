@@ -20,9 +20,9 @@ import { BEHAVIOURS, type World } from "./behaviours";
 import { collideMarbles } from "./collisions";
 import { findLanding } from "./landing";
 import {
-  changeColour,
   FLYING,
   type Landing,
+  MARBLE_PATTERNS,
   type Marble,
   motionAs,
   rollTo,
@@ -41,11 +41,13 @@ export type {
   Held,
   InTube,
   Marble,
+  MarbleLook,
+  MarblePattern,
   Motion,
   Rolling,
   SimulationEvent,
 } from "./marble";
-export { motionAs } from "./marble";
+export { MARBLE_PATTERNS, motionAs } from "./marble";
 export { PHYSICS } from "./physics";
 
 /** Where marbles can be on screen before they wrap round or are removed */
@@ -57,6 +59,9 @@ interface Bounds {
 }
 
 let marbleCounter = 0;
+
+/** Stepping round the colour wheel by this keeps colours far apart */
+const GOLDEN_ANGLE = 137.508;
 
 /**
  * Marbles rolling and falling over a track. Call `advance` every frame.
@@ -77,7 +82,7 @@ export class Simulation {
 
   constructor(random: () => number = Math.random) {
     this.random = random;
-    this.seesaws = new Seesaws(random);
+    this.seesaws = new Seesaws();
   }
 
   /** What special pieces' behaviours can reach */
@@ -121,7 +126,11 @@ export class Simulation {
     marbleCounter += 1;
     const marble: Marble = {
       id: `marble-${marbleCounter}`,
-      hue: Math.floor(this.random() * 360),
+      look: {
+        // Each marble a quite different colour from the last
+        hue: (marbleCounter * GOLDEN_ANGLE) % 360,
+        pattern: pick([...MARBLE_PATTERNS], this.random),
+      },
       position: fromScreen(right, up, this.bounds.frontDepth),
       motion: FLYING,
       velocity: { x: 0, y: 0, z: 0 },
@@ -317,7 +326,7 @@ export class Simulation {
     };
 
     events.push({ type: "land", marbleId: marble.id, impact: Math.abs(v.z) });
-    events.push({ type: "paint", pieceId: piece.id, hue: marble.hue });
+    events.push({ type: "visit", pieceId: piece.id, marbleId: marble.id });
   }
 
   /**
@@ -386,7 +395,7 @@ export class Simulation {
       exit,
       entry: entrySide,
     };
-    events.push({ type: "paint", pieceId: piece.id, hue: marble.hue });
+    events.push({ type: "visit", pieceId: piece.id, marbleId: marble.id });
   }
 
   /** Roll off the end of the track into the air */
@@ -398,8 +407,6 @@ export class Simulation {
     // Heading towards the camera, it can land on anything that looks below
     // it. Heading away, it drops behind pieces that are in front of it.
     marble.headingForward = direction === "+x" || direction === "+y";
-
-    changeColour(marble, this.random);
   }
 }
 
