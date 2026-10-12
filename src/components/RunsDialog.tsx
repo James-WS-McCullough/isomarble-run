@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { SavedRun } from "@/lib/saves";
 import { Dialog } from "./Dialog";
+import { NOT_A_LOGIN } from "./notALogin";
 
 interface RunsDialogProps {
   saves: SavedRun[];
@@ -101,23 +102,28 @@ function RunCard({
 
       <div className="flex flex-col gap-1 p-2">
         {renaming ? (
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              const trimmed = name.trim();
-              if (trimmed) onRename(trimmed);
-              setRenaming(false);
+          <input
+            {...NOT_A_LOGIN}
+            ref={(input) => input?.focus()}
+            value={name}
+            maxLength={60}
+            onChange={(event) => setName(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                // Handled here: don't let it press a button once the box goes
+                event.preventDefault();
+                const trimmed = name.trim();
+                if (trimmed) onRename(trimmed);
+                setRenaming(false);
+              } else if (event.key === "Escape") {
+                // Just stop renaming, without closing the whole dialog
+                event.stopPropagation();
+                setRenaming(false);
+              }
             }}
-          >
-            <input
-              ref={(input) => input?.focus()}
-              value={name}
-              maxLength={60}
-              onChange={(event) => setName(event.target.value)}
-              onBlur={() => setRenaming(false)}
-              className="w-full rounded border border-stone-600 bg-stone-900 px-1.5 py-0.5 text-sm outline-none focus:border-amber-500"
-            />
-          </form>
+            onBlur={() => setRenaming(false)}
+            className="w-full rounded border border-stone-600 bg-stone-900 px-1.5 py-0.5 text-sm outline-none focus:border-amber-500"
+          />
         ) : (
           <p className="truncate text-sm font-medium" title={save.name}>
             {save.name}
