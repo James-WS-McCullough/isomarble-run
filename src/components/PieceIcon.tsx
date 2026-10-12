@@ -160,7 +160,8 @@ function SpecialIcon({
           <circle cx={right ? 30 : 10} cy="17" r="3" fill="#2a1d14" />
         </>
       ) : kind === "funnel" ? (
-        <>
+        // Upside down, it's flipped and the marble goes up through it
+        <g transform={rotation % 2 === 1 ? "matrix(1 0 0 -1 0 40)" : undefined}>
           <path d="M5 5 L35 5 L27 18 L13 18 Z" {...glass} />
           <rect x="13" y="17" width="14" height="19" rx="2" {...glass} />
           <rect x="4" y="3" width="32" height="3" rx="1" fill="#c99c66" />
@@ -172,7 +173,7 @@ function SpecialIcon({
             strokeWidth="1.5"
             fill="none"
           />
-        </>
+        </g>
       ) : (
         <>
           <rect x="13" y="4" width="14" height="32" rx="3" {...glass} />

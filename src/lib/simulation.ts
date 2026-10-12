@@ -4,7 +4,7 @@ import {
   directionOfVelocity,
   oppositeDirection,
 } from "./directions";
-import { FUNNEL, funnelRoom } from "./funnel";
+import { FUNNEL, funnelRoom, isUpsideDown } from "./funnel";
 import { marbleHeightAt, nearestOnRoute, routeToExit } from "./grooves";
 import { Path, routeBetween } from "./paths";
 import { hasGroove, isTube, pieceExits, piecePorts } from "./pieces";
@@ -39,6 +39,12 @@ interface TubeState {
   sinking: boolean;
 }
 
+/**
+ * A marble rising towards the bottom of a tube is caught once its top
+ * reaches the opening, a little before its centre does
+ */
+const FUNNEL_REACH = MARBLE_RADIUS + 0.05;
+
 /** Tuning for how marbles move. Distances are in grid cells. */
 export const PHYSICS = {
   GRAVITY: 20,
@@ -64,6 +70,13 @@ export const PHYSICS = {
   AIR_SPEED: 4,
   /** How quickly a fan gets a marble up to speed */
   AIR_ACCELERATION: 30,
+  /** Upward speed a fan gives a marble that rolls or drops onto it: enough
+   * to fly about two tiles up */
+  FAN_KICK: 9,
+  /** Empty cells a fan's air can cross to suck marbles up a tube above it */
+  FAN_REACH: 2,
+  /** How much of its sideways speed a marble keeps when a fan kicks it up */
+  FAN_KEEP: 0.6,
   /** Below this horizontal speed a landing marble counts as dropping straight down */
   DROP_SPEED: 0.6,
   /** How quickly small visual snaps are smoothed out */
@@ -445,6 +458,8 @@ export class Simulation {
     marble.rolled.y += after.y - before.y;
     marble.position = after;
 
+    if (this.catchFromBelow(marble, before, after)) return true;
+
     // Landing on a face it visibly reaches wins over clipping the wall
     // underneath that face
     const landing = this.findLanding(marble, before, after);
@@ -740,6 +755,10 @@ export class Simulation {
     const cell = Math.round(z);
     if (this.tubeAt(column, cell)) return cell;
     if (this.tubeAt(column, cell - 1) && z < cell - 0.5 + 0.1) return cell - 1;
+    // Just touching the bottom of a column counts as inside it
+    if (this.tubeAt(column, cell + 1) && z >= cell + 0.5 - FUNNEL_REACH) {
+      return cell + 1;
+    }
     return null;
   }
 
@@ -756,10 +775,12 @@ export class Simulation {
     from?: Vec3,
   ) {
     const { x, y } = piece.cell;
+    // Only coming in through a funnel's wide mouth does it start off-centre
+    const throughMouth =
+      piece.kind === "funnel" &&
+      (isUpsideDown(piece) ? verticalSpeed > 0 : verticalSpeed <= 0);
     const offset =
-      from && piece.kind === "funnel"
-        ? { x: from.x - x, y: from.y - y }
-        : { x: 0, y: 0 };
+      from && throughMouth ? { x: from.x - x, y: from.y - y } : { x: 0, y: 0 };
     // Circle the way it was already heading round the middle
     const v = marble.velocity;
     const spin = offset.x * v.y - offset.y * v.x < 0 ? -1 : 1;
@@ -773,7 +794,10 @@ export class Simulation {
   /** Circle round a funnel, closing in on the middle as the marble drops */
   private swirl(tube: TubeState, cell: number, z: number, dt: number) {
     const piece = this.track.pieceAt({ x: tube.x, y: tube.y, z: cell });
-    const room = piece?.kind === "funnel" ? funnelRoom(z - cell) : 0;
+    let room = 0;
+    if (piece?.kind === "funnel") {
+      room = funnelRoom(isUpsideDown(piece) ? cell - z : z - cell);
+    }
     const { offset } = tube;
     const distance = Math.hypot(offset.x, offset.y);
     if (distance === 0) return;
@@ -815,11 +839,13 @@ export class Simulation {
       y: column.y,
       z: bottom - 1,
     });
-    const blown = base?.kind === "fan";
+    // A fan blows up the column from right below it, or sucks marbles up it
+    // from across a gap
+    const blown =
+      base?.kind === "fan" || (!base && this.fanAcrossGap(column, bottom));
 
     const v = marble.velocity;
-    const circling = column.offset.x !== 0 || column.offset.y !== 0;
-    if (blown && !column.sinking && !circling) {
+    if (blown && !column.sinking) {
       const change = clamp(
         PHYSICS.AIR_SPEED - v.z,
         -PHYSICS.AIR_ACCELERATION * dt,
@@ -828,8 +854,11 @@ export class Simulation {
       v.z += change;
     } else {
       v.z = Math.max(v.z - PHYSICS.GRAVITY * dt, -PHYSICS.MAX_SPEED);
-      // Rolling round the cone of a funnel holds it back
-      if (circling) v.z = Math.max(v.z, -FUNNEL.SWIRL_DROP);
+    }
+    // Rolling round the cone of a funnel holds it back
+    const circling = column.offset.x !== 0 || column.offset.y !== 0;
+    if (circling) {
+      v.z = clamp(v.z, -FUNNEL.SWIRL_VERTICAL, FUNNEL.SWIRL_VERTICAL);
     }
     let after = z + v.z * dt;
     this.swirl(column, cell, after, dt);
@@ -870,7 +899,7 @@ export class Simulation {
         );
         return;
       }
-    } else if (blown) {
+    } else if (base && blown) {
       // The fan keeps it from dropping into the fan itself, and blows it
       // back up once it gets there
       const floor = bottom - 0.5 + MARBLE_RADIUS;
@@ -890,6 +919,81 @@ export class Simulation {
       y: column.y + column.offset.y,
       z: after,
     });
+  }
+
+  /** Whether there's a fan below a column, across a few empty cells */
+  private fanAcrossGap(column: { x: number; y: number }, bottom: number) {
+    for (let gap = 1; gap <= PHYSICS.FAN_REACH; gap++) {
+      const below = this.track.pieceAt({
+        x: column.x,
+        y: column.y,
+        z: bottom - 1 - gap,
+      });
+      if (below) return below.kind === "fan";
+    }
+    return false;
+  }
+
+  /**
+   * A fan blows a marble that rolls or drops onto it upwards: straight into
+   * a tube or funnel stacked on it, or else up into the air
+   */
+  private blowUp(
+    marble: Marble,
+    fan: Piece,
+    from: Vec3,
+    events: SimulationEvent[],
+  ) {
+    const { x, y, z } = fan.cell;
+    events.push({ type: "paint", pieceId: fan.id, hue: marble.hue });
+    const above = this.track.pieceAt({ x, y, z: z + 1 });
+    if (above && isTube(above.kind)) {
+      this.enterTube(
+        marble,
+        above,
+        z + restHeight(fan.kind),
+        PHYSICS.AIR_SPEED,
+        from,
+      );
+      return;
+    }
+
+    const v = marble.velocity;
+    marble.rolling = null;
+    marble.velocity = {
+      x: v.x * PHYSICS.FAN_KEEP,
+      y: v.y * PHYSICS.FAN_KEEP,
+      z: PHYSICS.FAN_KICK,
+    };
+    marble.headingForward = v.x + v.y > 0;
+    this.snapTo(marble, from);
+  }
+
+  /**
+   * Rising into the bottom of a tube, or the wide mouth of an upside-down
+   * funnel: caught, and carried up into the column
+   */
+  private catchFromBelow(marble: Marble, before: Vec3, after: Vec3): boolean {
+    if (after.z <= before.z) return false;
+    const x = Math.round(after.x);
+    const y = Math.round(after.y);
+    const level = Math.round(after.z + 0.5 + FUNNEL_REACH);
+    const piece = this.track.pieceAt({ x, y, z: level });
+    if (!piece || !isTube(piece.kind)) return false;
+    // Already inside the column, rising through it
+    if (this.tubeAt({ x, y }, level - 1)) return false;
+    const mouth = level - 0.5 - FUNNEL_REACH;
+    if (before.z >= mouth || after.z < mouth) return false;
+    const radius = isUpsideDown(piece)
+      ? FUNNEL.MOUTH_RADIUS
+      : FUNNEL.NECK_RADIUS;
+    if (Math.hypot(after.x - x, after.y - y) > radius) return false;
+
+    this.enterTube(marble, piece, mouth, marble.velocity.z, {
+      ...after,
+      z: mouth,
+    });
+    return true;
   }
 
   private leaveThroughSpout(
@@ -923,6 +1027,17 @@ export class Simulation {
     if (piece.kind === "seesaw") {
       marble.position = point;
       this.landOnSeesaw(marble, piece, events);
+      return;
+    }
+
+    // Dropping onto a fan: blown back up
+    if (piece.kind === "fan") {
+      events.push({
+        type: "land",
+        marbleId: marble.id,
+        impact: Math.abs(v.z),
+      });
+      this.blowUp(marble, piece, point, events);
       return;
     }
 
@@ -998,7 +1113,7 @@ export class Simulation {
     }
 
     // Rolling in over a funnel's rim: circle down into it
-    if (piece.kind === "funnel") {
+    if (piece.kind === "funnel" && !isUpsideDown(piece)) {
       const v = DIRECTION_VECTORS[entrySide];
       const rim = {
         x: x + v.x / 2,
@@ -1022,18 +1137,27 @@ export class Simulation {
       events.push({ type: "paint", pieceId: piece.id, hue: marble.hue });
       return;
     }
-    // Rolling into a fan's intake: blown up the tube above it
-    if (piece.kind === "fan" && intoOpening && this.tubeAt({ x, y }, z + 1)) {
-      this.enterTube(marble, piece, z + restHeight(piece.kind), 1);
-      events.push({ type: "paint", pieceId: piece.id, hue: marble.hue });
+    // Rolling onto a fan, or into its intake: blown upwards
+    if (piece.kind === "fan") {
+      const v = DIRECTION_VECTORS[arriving];
+      const side = DIRECTION_VECTORS[entrySide];
+      marble.velocity = {
+        x: v.x * marble.speed,
+        y: v.y * marble.speed,
+        z: 0,
+      };
+      this.blowUp(
+        marble,
+        piece,
+        { x: x + side.x / 2, y: y + side.y / 2, z: z + restHeight(piece.kind) },
+        events,
+      );
       return;
     }
 
     // From down in a groove, a side with no opening is a solid wall, and
-    // the glass sides of a tube always are. So is a fan with nothing to
-    // blow the marble up into.
-    const deadEnd = piece.kind === "fan" && intoOpening;
-    if ((throughSide && (!fromFlat || isTube(piece.kind))) || deadEnd) {
+    // the glass sides of a tube always are
+    if (throughSide && (!fromFlat || isTube(piece.kind))) {
       // Touch the wall at groove height, then head back
       const v = DIRECTION_VECTORS[entrySide];
       const wall = {

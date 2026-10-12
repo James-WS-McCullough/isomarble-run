@@ -1,9 +1,11 @@
+import type { PieceKind } from "./pieces";
 import { MARBLE_RADIUS } from "./space";
 
 /**
  * Shape of the funnel, shared by the physics and the 3D model. Heights are
- * relative to the piece centre. It's a cone from a mouth filling the top of
- * the tile down to a neck as wide as a tube, then a straight pipe.
+ * relative to the piece centre, the right way up. It's a cone from a mouth
+ * filling the top of the tile down to a neck as wide as a tube, then a
+ * straight pipe. Turned upside down, it catches marbles blown up from below.
  */
 export const FUNNEL = {
   /** Radius of the mouth, at the top of the piece */
@@ -12,8 +14,8 @@ export const FUNNEL = {
   NECK_RADIUS: 0.3,
   /** Height of the neck */
   NECK_HEIGHT: 0.05,
-  /** Fastest a marble drops while circling round the funnel */
-  SWIRL_DROP: 1.2,
+  /** Fastest a marble moves up or down while circling round the funnel */
+  SWIRL_VERTICAL: 1.2,
   /** How fast it circles (speed round the funnel) */
   SWIRL_SPEED: 2.4,
   /** How fast a marble that landed out on the rim slides in to the cone */
@@ -30,4 +32,12 @@ export function funnelRoom(height: number): number {
   const mouthRoom = FUNNEL.MOUTH_RADIUS - MARBLE_RADIUS;
   const f = (height - FUNNEL.NECK_HEIGHT) / (top - FUNNEL.NECK_HEIGHT);
   return mouthRoom * Math.min(1, Math.max(0, f));
+}
+
+/** Funnels turned an odd number of times are upside down, mouth facing down */
+export function isUpsideDown(piece: {
+  kind: PieceKind;
+  rotation: number;
+}): boolean {
+  return piece.kind === "funnel" && piece.rotation % 2 === 1;
 }

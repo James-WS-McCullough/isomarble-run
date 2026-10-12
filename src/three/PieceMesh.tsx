@@ -1,5 +1,6 @@
 "use client";
 
+import { isUpsideDown } from "@/lib/funnel";
 import type { PieceKind } from "@/lib/pieces";
 import { type Cell, toThree } from "@/lib/space";
 import {
@@ -63,7 +64,12 @@ export function PieceMesh({
     }[kind];
     return (
       <group {...placement}>
-        <Special hue={hue} look={look} raycast={raycast} />
+        <Special
+          hue={hue}
+          look={look}
+          raycast={raycast}
+          upsideDown={isUpsideDown({ kind, rotation })}
+        />
       </group>
     );
   }

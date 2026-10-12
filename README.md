@@ -19,8 +19,8 @@ Pieces: **1** Straight, **2** Curve, **3** Splitter, **4** Crossing, **5** Catch
 
 - **🧪 Tube**: a vertical glass pipe. Marbles that fall in the top drop down inside it and land on whatever is below.
 - **↪️ Outlet**: a tube with a spout. Marbles blown up to it shoot out of the spout onto the track; marbles rolling into the spout drop down the tube.
-- **🥤 Funnel**: a wide glass mouth on top of a tube. Marbles that land anywhere on it, or roll in over its rim, spiral down into the tube below. Stack funnel → tubes → outlet → tube → fan for a lift: dropped marbles sink to the fan, then get blown back up and out of the outlet.
-- **🌀 Fan**: blows marbles up the tubes stacked on top of it. Marbles roll in through the intake on its side. A blown tube with no outlet makes a fountain.
+- **🥤 Funnel**: a wide glass mouth on a tube. Marbles that land anywhere on it, or roll in over its rim, spiral down into the tube below. Press **R** to turn it upside down, so its mouth catches marbles blown up from below.
+- **🌀 Fan**: a jump pad. Marbles that roll or drop onto it get blown about two tiles up. If they rise into the bottom of a tube (or an upside-down funnel) on the way, the fan sucks them up the whole column like a vacuum, out of the first outlet or the open top. Marbles dropped into a column above a fan sink to the bottom first, then get blown back up.
 - **⚖️ Seesaw**: three tiles long, with a stand in the middle and a cup over each end. A marble waits in the low cup; when another lands (or rolls) into the high cup, it tips over and flings the waiting marble into the air, and the new one waits in its place, ready to go again.
 
 | Control | Action |

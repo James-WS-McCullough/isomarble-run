@@ -90,4 +90,60 @@ describe("funnels", () => {
     }
     expect(inFunnel).toBe(true);
   });
+
+  it("is kicked up into the air by a fan it rolls onto", () => {
+    const pieces = [
+      createPiece("straight", 0, { x: -1, y: 0, z: 0 }),
+      createPiece("fan", 0, { x: 0, y: 0, z: 0 }),
+    ];
+    // With this random source it sets off along the track towards the fan
+    const sim = new Simulation(() => 0);
+    sim.setPieces(pieces);
+    const marble = sim.addMarble({ x: -1, y: 0, z: 1.5 });
+
+    let highest = Number.NEGATIVE_INFINITY;
+    let passedFan = false;
+    for (let i = 0; i < 120; i++) {
+      sim.advance(1 / 60);
+      if (marble.position.x > 0) {
+        passedFan = true;
+        highest = Math.max(highest, marble.position.z);
+      }
+    }
+    expect(passedFan).toBe(true);
+    // About two tiles up from the top of the fan
+    expect(highest).toBeGreaterThan(2.4);
+  });
+
+  const catchers = [
+    { name: "an upside-down funnel stacked on it", up: 0, kind: "funnel" },
+    { name: "an upside-down funnel a block above", up: 1, kind: "funnel" },
+    { name: "a tube two blocks above", up: 2, kind: "tube" },
+  ] as const;
+  for (const { name, up, kind } of catchers) {
+    it(`sucks a marble kicked up by a fan into ${name}`, () => {
+      const pieces = [
+        createPiece("straight", 0, { x: -1, y: 0, z: 0 }),
+        createPiece("fan", 0, { x: 0, y: 0, z: 0 }),
+        // A funnel turned once is upside down
+        createPiece(kind, 1, { x: 0, y: 0, z: 1 + up }),
+        createPiece("tube", 0, { x: 0, y: 0, z: 2 + up }),
+        createPiece("outlet", 0, { x: 0, y: 0, z: 3 + up }),
+        createPiece("straight", 0, { x: 1, y: 0, z: 3 + up }),
+        createPiece("straight", 0, { x: 2, y: 0, z: 3 + up }),
+      ];
+      const sim = new Simulation(() => 0);
+      sim.setPieces(pieces);
+      const marble = sim.addMarble({ x: -1, y: 0, z: 1.5 });
+
+      let inTube = false;
+      const events: SimulationEvent[] = [];
+      for (let i = 0; i < 240; i++) {
+        events.push(...sim.advance(1 / 60));
+        inTube ||= marble.tube !== null;
+      }
+      expect(inTube).toBe(true);
+      expect(painted(events, pieces)).toContain(`straight@1,0,${3 + up}`);
+    });
+  }
 });
