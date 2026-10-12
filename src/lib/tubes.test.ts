@@ -1,21 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { motionAs, Simulation, type SimulationEvent } from "./simulation";
-import { createPiece, type Piece } from "./track";
-
-function painted(events: SimulationEvent[], pieces: Piece[]): string[] {
-  const names = new Map(
-    pieces.map((p) => [p.id, `${p.kind}@${p.cell.x},${p.cell.y},${p.cell.z}`]),
-  );
-  return events.flatMap((e) =>
-    e.type === "paint" ? [names.get(e.pieceId) ?? "?"] : [],
-  );
-}
-
-function run(sim: Simulation, seconds: number): SimulationEvent[] {
-  const events: SimulationEvent[] = [];
-  for (let t = 0; t < seconds; t += 1 / 60) events.push(...sim.advance(1 / 60));
-  return events;
-}
+import { painted, run } from "./testing";
+import { createPiece } from "./track";
 
 describe("tubes and fans", () => {
   it("drops a marble down a tube onto the track below", () => {

@@ -22,7 +22,7 @@ import { clamp } from "./vector";
  * A marble rising towards the bottom of a tube is caught once its top
  * reaches the opening, a little before its centre does
  */
-const FUNNEL_REACH = MARBLE_RADIUS + 0.05;
+const TUBE_CATCH_REACH = MARBLE_RADIUS + 0.05;
 
 /**
  * Which tube in a column a marble at height `z` is inside, or null.
@@ -40,7 +40,7 @@ export function tubeCell(
   if (tubeAt(cell)) return cell;
   if (tubeAt(cell - 1) && z < cell - 0.5 + 0.1) return cell - 1;
   // Just touching the bottom of a column counts as inside it
-  if (tubeAt(cell + 1) && z >= cell + 0.5 - FUNNEL_REACH) {
+  if (tubeAt(cell + 1) && z >= cell + 0.5 - TUBE_CATCH_REACH) {
     return cell + 1;
   }
   return null;
@@ -250,12 +250,12 @@ export function catchFromBelow(
   if (after.z <= before.z) return false;
   const x = Math.round(after.x);
   const y = Math.round(after.y);
-  const level = Math.round(after.z + 0.5 + FUNNEL_REACH);
+  const level = Math.round(after.z + 0.5 + TUBE_CATCH_REACH);
   const piece = track.pieceAt({ x, y, z: level });
   if (!piece || !isTube(piece.kind)) return false;
   // Already inside the column, rising through it
   if (track.isTubeAt({ x, y, z: level - 1 })) return false;
-  const mouth = level - 0.5 - FUNNEL_REACH;
+  const mouth = level - 0.5 - TUBE_CATCH_REACH;
   if (before.z >= mouth || after.z < mouth) return false;
   enterTube(marble, piece, mouth, marble.velocity.z, {
     ...after,

@@ -1,19 +1,13 @@
 "use client";
 
 import { useFrame } from "@react-three/fiber";
-import { createContext, useContext, useRef } from "react";
+import { useContext, useRef } from "react";
 import * as THREE from "three";
 import { SEESAW } from "@/lib/seesaw";
-import type { Simulation } from "@/lib/simulation";
-import {
-  getPieceMaterial,
-  OUTLINE_MATERIAL,
-  type PieceLook,
-} from "./materials";
+import { getPieceMaterial, OUTLINE_MATERIAL } from "./materials";
+import type { ModelProps } from "./PieceMesh";
 import { getPieceGeometry } from "./pieceGeometry";
-
-/** The running simulation, so moving parts like seesaws can follow it */
-export const SimulationContext = createContext<Simulation | null>(null);
+import { SimulationContext } from "./SimulationContext";
 
 const baseGeometry = new THREE.BoxGeometry(0.86, 0.36, 0.86);
 baseGeometry.translate(0, -0.32, 0);
@@ -58,18 +52,11 @@ const cupMaterial = new THREE.MeshStandardMaterial({
   side: THREE.DoubleSide,
 });
 
-interface SeesawProps {
-  pieceId?: string;
-  hue?: number;
-  look: PieceLook;
-  raycast?: () => null;
-}
-
 /**
  * A cup seesaw, built along +x: a stand in the middle tile and a cup over
  * the tile at each end. It tips to follow the simulation.
  */
-export function Seesaw({ pieceId, hue, look, raycast }: SeesawProps) {
+export function Seesaw({ pieceId, hue, look, raycast }: ModelProps) {
   const simulation = useContext(SimulationContext);
   const beam = useRef<THREE.Group>(null);
   const block = getPieceGeometry("block");

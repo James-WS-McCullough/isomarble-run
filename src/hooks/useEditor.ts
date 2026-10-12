@@ -5,7 +5,8 @@ import { PIECES, type PieceKind } from "@/lib/pieces";
 import { fitsAt, slideCell, snapToJoins } from "@/lib/placement";
 import { type Cell, cellKey, type Vec3 } from "@/lib/space";
 import { createPiece, type Piece } from "@/lib/track";
-import type { BoardTarget, Ghost } from "@/three/Board";
+import type { Ghost } from "@/three/Board";
+import type { BoardTarget } from "@/three/targeting";
 import { useHistory } from "./useHistory";
 
 export type Tool = "build" | "move" | "marble" | "erase";

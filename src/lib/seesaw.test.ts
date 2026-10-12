@@ -1,11 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { fitsAt } from "./placement";
 import { motionAs, Simulation } from "./simulation";
+import { run } from "./testing";
 import { createPiece, TrackIndex } from "./track";
-
-function settle(sim: Simulation, seconds = 1) {
-  for (let t = 0; t < seconds; t += 1 / 60) sim.advance(1 / 60);
-}
 
 describe("cup seesaw", () => {
   // The beam runs along x; it starts with its +x cup down
@@ -16,7 +13,7 @@ describe("cup seesaw", () => {
     const piece = seesaw();
     sim.setPieces([piece]);
     const marble = sim.addMarble({ x: 1, y: 0, z: 1.5 });
-    settle(sim);
+    run(sim, 1);
     expect(motionAs(marble, "held")?.side).toBe(1);
     expect(sim.marbles).toContain(marble);
   });
@@ -26,7 +23,7 @@ describe("cup seesaw", () => {
     const piece = seesaw();
     sim.setPieces([piece]);
     const waiting = sim.addMarble({ x: 1, y: 0, z: 1.5 });
-    settle(sim);
+    run(sim, 1);
     const tilt = sim.seesawTilt(piece.id);
 
     const trigger = sim.addMarble({ x: -1, y: 0, z: 1.5 });
@@ -47,9 +44,9 @@ describe("cup seesaw", () => {
     const piece = seesaw();
     sim.setPieces([piece]);
     const first = sim.addMarble({ x: 1, y: 0, z: 1.5 });
-    settle(sim);
+    run(sim, 1);
     const second = sim.addMarble({ x: 1.05, y: 0, z: 2.5 });
-    settle(sim, 0.6);
+    run(sim, 0.6);
     expect(motionAs(first, "held")?.side).toBe(1);
     expect(motionAs(second, "held")).toBeNull();
   });
@@ -62,7 +59,7 @@ describe("cup seesaw", () => {
     const track = createPiece("straight", 0, { x: 2, y: 0, z: 0 });
     sim.setPieces([piece, track]);
     const marble = sim.addMarble({ x: 2, y: 0, z: 1.5 });
-    settle(sim, 3);
+    run(sim, 3);
     expect(motionAs(marble, "held")?.piece).toBe(piece);
   });
 

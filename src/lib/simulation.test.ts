@@ -1,28 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { pieceExits } from "./pieces";
-import {
-  motionAs,
-  PHYSICS,
-  Simulation,
-  type SimulationEvent,
-  type Simulation as SimulationType,
-} from "./simulation";
+import { motionAs, PHYSICS, Simulation } from "./simulation";
 import { screenOf } from "./space";
+import { paintedIds, run } from "./testing";
 import { createPiece, TrackIndex } from "./track";
-
-function run(sim: SimulationType, seconds: number): SimulationEvent[] {
-  const events: SimulationEvent[] = [];
-  for (let t = 0; t < seconds; t += 1 / 60) {
-    events.push(...sim.advance(1 / 60));
-  }
-  return events;
-}
-
-function paintedIds(events: SimulationEvent[]): string[] {
-  return events.flatMap((event) =>
-    event.type === "paint" ? [event.pieceId] : [],
-  );
-}
 
 /** A point on screen just above a piece's top face */
 function above(cell: { x: number; y: number; z: number }) {

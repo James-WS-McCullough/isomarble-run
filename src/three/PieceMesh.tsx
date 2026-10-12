@@ -3,6 +3,7 @@
 import type { ComponentType } from "react";
 import type { PieceKind } from "@/lib/pieces";
 import { type Cell, toThree } from "@/lib/space";
+import { Fan } from "./FanMesh";
 import {
   getPieceMaterial,
   OUTLINE_MATERIAL,
@@ -10,7 +11,7 @@ import {
 } from "./materials";
 import { getPieceGeometry } from "./pieceGeometry";
 import { Seesaw } from "./SeesawMesh";
-import { Fan, GlassFunnel, GlassOutlet, GlassTube } from "./TubePieces";
+import { GlassFunnel, GlassOutlet, GlassTube } from "./TubeMeshes";
 
 interface PieceMeshProps {
   kind: PieceKind;

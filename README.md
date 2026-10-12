@@ -100,7 +100,7 @@ src/
     track.ts              Placed pieces and fast lookups by on-screen position
     pieces.ts             Every kind of piece: its shape, openings and rules
     centrelines.ts        Building blocks for the grooves carved into pieces
-    grooves.ts            Groove shapes, shared by the 3D models and the physics
+    grooves.ts            The carved surface, shared by the 3D models and the physics
     paths.ts              Routes across the top of a piece
     space.ts              World coordinates and the isometric projection
     directions.ts         The four horizontal directions
@@ -111,13 +111,17 @@ src/
     seesaw.ts             Cup seesaw geometry, shared by the physics and the model
     funnel.ts             Funnel shape, shared by the physics and the model
     air.ts                Where the air from each fan rises, for drawing it
+    testing.ts            Helpers shared by the simulation tests
   three/
-    Board.tsx             The 3D scene, pointer handling and build preview
+    Board.tsx             The 3D scene and build preview
+    targeting.ts          What the pointer is over, and where a piece would go
+    SimulationContext.ts  The running simulation, for moving parts to follow
     CameraRig.tsx         Fixed isometric camera with zoom and pan
-    PieceMesh.tsx         A wooden piece
+    PieceMesh.tsx         Any piece: its own model, or a block carved with its grooves
     Marbles.tsx           Glass marbles that spin as they roll
     pieceGeometry.ts      Piece models, with rounded grooves carved into the top
-    TubePieces.tsx        Glass tubes, outlets, funnels and fans
+    TubeMeshes.tsx        Glass tubes, outlets and funnels
+    FanMesh.tsx           The fan set into its crossroads
     SeesawMesh.tsx        The cup seesaw, tipping with the simulation
     AirParticles.tsx      Air rising from fans and through the tubes they blow
     materials.ts          Stained wood and marble materials

@@ -1,19 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { motionAs, Simulation } from "./simulation";
+import { runUntil, sequence } from "./testing";
 import { createPiece, type Piece } from "./track";
-
-/** Random numbers from a list, then 0.5 forever */
-function sequence(...values: number[]) {
-  let i = 0;
-  return () => (i < values.length ? values[i++] : 0.5);
-}
 
 function row(xs: number[], at = (x: number) => ({ x, y: 0, z: 0 })): Piece[] {
   return xs.map((x) => createPiece("straight", 0, at(x)));
-}
-
-function rollUntil(sim: Simulation, done: () => boolean, maxSteps = 600) {
-  for (let i = 0; i < maxSteps && !done(); i++) sim.advance(1 / 60);
 }
 
 describe("marble collisions", () => {
@@ -23,7 +14,7 @@ describe("marble collisions", () => {
     const left = sim.addMarble({ x: -2, y: 0, z: 1.2 });
     const right = sim.addMarble({ x: 2, y: 0, z: 1.2 });
 
-    rollUntil(
+    runUntil(
       sim,
       () =>
         motionAs(left, "rolling") !== null &&
@@ -46,7 +37,7 @@ describe("marble collisions", () => {
     sim.setPieces(row([-4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6]));
     const back = sim.addMarble({ x: -3, y: 0, z: 1.2 });
     const front = sim.addMarble({ x: -1, y: 0, z: 1.2 });
-    rollUntil(
+    runUntil(
       sim,
       () =>
         motionAs(back, "rolling") !== null &&
@@ -74,7 +65,7 @@ describe("marble collisions", () => {
     sim.setPieces(pieces);
     const left = sim.addMarble({ x: -1, y: 0, z: 1.2 });
     const right = sim.addMarble({ x: 3, y: 1, z: 2.2 });
-    rollUntil(
+    runUntil(
       sim,
       () =>
         motionAs(left, "rolling") !== null &&
