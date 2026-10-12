@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { PIECES, type PieceKind } from "@/lib/pieces";
-import { LOWEST_LEVEL, slideCell, snapToJoins } from "@/lib/placement";
+import { fitsAt, slideCell, snapToJoins } from "@/lib/placement";
 import { type Cell, cellKey, type Vec3 } from "@/lib/space";
 import { createPiece, type Piece } from "@/lib/track";
 import type { BoardTarget, Ghost } from "@/three/Board";
@@ -54,11 +54,11 @@ export function useEditor({
   /** Extra steps along the line of sight, chosen with [ and ] */
   const [depthNudge, setDepthNudge] = useState(0);
 
-  const canPlace = (cell: Cell, ignoreId?: string) =>
-    cell.z >= LOWEST_LEVEL &&
-    !pieces.some(
-      (piece) => piece.id !== ignoreId && sameCell(piece.cell, cell),
-    );
+  const canPlace = (
+    placed: { kind: PieceKind; rotation: number },
+    cell: Cell,
+    ignoreId?: string,
+  ) => fitsAt(pieces, placed.kind, placed.rotation, cell, ignoreId);
 
   const removePiece = (pieceId: string) =>
     history.commit(pieces.filter((piece) => piece.id !== pieceId));
@@ -111,17 +111,21 @@ export function useEditor({
 
   // Keep the dragged piece's destination up to date
   useEffect(() => {
-    if (!drag || !placeCell) return;
+    if (!drag || !placeCell || !draggedPiece) return;
     if (cellKey(placeCell) === cellKey(drag.cell)) return;
     setDrag({
       ...drag,
       cell: placeCell,
-      valid: canPlace(placeCell, drag.pieceId),
+      valid: canPlace(draggedPiece, placeCell, drag.pieceId),
     });
   });
 
   const onClick = () => {
-    if (tool === "build" && placeCell && canPlace(placeCell)) {
+    if (
+      tool === "build" &&
+      placeCell &&
+      canPlace({ kind, rotation }, placeCell)
+    ) {
       history.commit([...pieces, createPiece(kind, rotation, placeCell)]);
     }
   };
@@ -232,7 +236,12 @@ export function useEditor({
 
   const ghost: Ghost | null =
     tool === "build" && placeCell
-      ? { kind, rotation, cell: placeCell, valid: canPlace(placeCell) }
+      ? {
+          kind,
+          rotation,
+          cell: placeCell,
+          valid: canPlace({ kind, rotation }, placeCell),
+        }
       : null;
 
   // While dragging, show the piece where it would land

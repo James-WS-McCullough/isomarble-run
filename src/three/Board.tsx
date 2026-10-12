@@ -12,10 +12,11 @@ import type { Object3D } from "three";
 import type { PieceKind } from "@/lib/pieces";
 import type { Simulation, SimulationEvent } from "@/lib/simulation";
 import type { Cell, Vec3 } from "@/lib/space";
-import type { Piece } from "@/lib/track";
+import { footprint, type Piece } from "@/lib/track";
 import { CameraRig } from "./CameraRig";
 import { Marbles } from "./Marbles";
 import { PieceMesh } from "./PieceMesh";
+import { SimulationContext } from "./SeesawMesh";
 
 /** What the pointer is over */
 export interface BoardTarget {
@@ -85,39 +86,41 @@ export function Board(props: BoardProps) {
         onEvents={props.onSimulationEvents}
       />
 
-      {/* biome-ignore lint/a11y/noStaticElementInteractions: a three.js group, not a DOM element */}
-      <group
-        onPointerMove={(event) => onTargetChange(toTarget(event))}
-        onPointerDown={(event) => {
-          // Shift-drag pans the camera instead
-          if (!event.shiftKey)
-            props.onPointerDown(toTarget(event), event.button);
-        }}
-        onClick={(event) => props.onClick(toTarget(event))}
-        onContextMenu={(event) => {
-          event.nativeEvent.preventDefault();
-          props.onRightClick(toTarget(event));
-        }}
-      >
-        {/* Invisible floor at the bottom of level 0, for building on */}
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.5, 0]}>
-          <planeGeometry args={[400, 400]} />
-          <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-        </mesh>
+      <SimulationContext.Provider value={props.simulation}>
+        {/* biome-ignore lint/a11y/noStaticElementInteractions: a three.js group, not a DOM element */}
+        <group
+          onPointerMove={(event) => onTargetChange(toTarget(event))}
+          onPointerDown={(event) => {
+            // Shift-drag pans the camera instead
+            if (!event.shiftKey)
+              props.onPointerDown(toTarget(event), event.button);
+          }}
+          onClick={(event) => props.onClick(toTarget(event))}
+          onContextMenu={(event) => {
+            event.nativeEvent.preventDefault();
+            props.onRightClick(toTarget(event));
+          }}
+        >
+          {/* Invisible floor at the bottom of level 0, for building on */}
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.5, 0]}>
+            <planeGeometry args={[400, 400]} />
+            <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+          </mesh>
 
-        {pieces.map((piece) => (
-          <PieceMesh
-            key={piece.id}
-            pieceId={piece.id}
-            kind={piece.kind}
-            rotation={piece.rotation}
-            cell={piece.cell}
-            hue={props.paint[piece.id]}
-            look={piece.id === props.highlightedId ? "highlight" : "normal"}
-            pickable={piece.id !== props.draggingId}
-          />
-        ))}
-      </group>
+          {pieces.map((piece) => (
+            <PieceMesh
+              key={piece.id}
+              pieceId={piece.id}
+              kind={piece.kind}
+              rotation={piece.rotation}
+              cell={piece.cell}
+              hue={props.paint[piece.id]}
+              look={piece.id === props.highlightedId ? "highlight" : "normal"}
+              pickable={piece.id !== props.draggingId}
+            />
+          ))}
+        </group>
+      </SimulationContext.Provider>
 
       {props.ghost && <GhostPiece ghost={props.ghost} />}
 
@@ -154,19 +157,22 @@ function GhostPiece({ ghost }: { ghost: Ghost }) {
         look={ghost.valid ? "ghost" : "blocked"}
         pickable={false}
       />
-      <mesh
-        rotation={[-Math.PI / 2, 0, 0]}
-        position={[cell.x, -0.495, cell.y]}
-        raycast={() => null}
-      >
-        <planeGeometry args={[1, 1]} />
-        <meshBasicMaterial
-          color={colour}
-          transparent
-          opacity={0.35}
-          depthWrite={false}
-        />
-      </mesh>
+      {footprint(ghost).map((part) => (
+        <mesh
+          key={`${part.x},${part.y}`}
+          rotation={[-Math.PI / 2, 0, 0]}
+          position={[part.x, -0.495, part.y]}
+          raycast={() => null}
+        >
+          <planeGeometry args={[1, 1]} />
+          <meshBasicMaterial
+            color={colour}
+            transparent
+            opacity={0.35}
+            depthWrite={false}
+          />
+        </mesh>
+      ))}
       {cell.z !== 0 && (
         // A line from the piece to the floor (up to it, if it's below)
         <mesh
@@ -286,7 +292,7 @@ function targetFromEvent(
   if (piece) {
     return {
       pieceId: piece.id,
-      placeCell: neighbourFacing(piece.cell, point),
+      placeCell: neighbourFacing(nearestCell(footprint(piece), point), point),
       point,
     };
   }
@@ -296,6 +302,15 @@ function targetFromEvent(
     placeCell: { x: Math.round(point.x), y: Math.round(point.y), z: 0 },
     point,
   };
+}
+
+/** The cell of a (possibly multi-cell) piece closest to a point */
+function nearestCell(cells: Cell[], point: Vec3): Cell {
+  const distance = (cell: Cell) =>
+    Math.hypot(point.x - cell.x, point.y - cell.y);
+  return cells.reduce((best, cell) =>
+    distance(cell) < distance(best) ? cell : best,
+  );
 }
 
 /**

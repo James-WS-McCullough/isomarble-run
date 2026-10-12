@@ -8,6 +8,7 @@ import {
   type PieceLook,
 } from "./materials";
 import { getPieceGeometry } from "./pieceGeometry";
+import { Seesaw } from "./SeesawMesh";
 import { Fan, GlassOutlet, GlassTube } from "./TubePieces";
 
 interface PieceMeshProps {
@@ -39,6 +40,14 @@ export function PieceMesh({
     rotation: [0, (-rotation * Math.PI) / 2, 0] as [number, number, number],
     userData: { pieceId },
   };
+
+  if (kind === "seesaw") {
+    return (
+      <group {...placement}>
+        <Seesaw pieceId={pieceId} hue={hue} look={look} raycast={raycast} />
+      </group>
+    );
+  }
 
   if (kind === "tube" || kind === "outlet" || kind === "fan") {
     const Special =

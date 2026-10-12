@@ -1,7 +1,7 @@
 import { DIRECTIONS, oppositeDirection } from "./directions";
 import { hasGroove, type PieceKind, piecePorts } from "./pieces";
 import { type Cell, cellKey } from "./space";
-import { type Piece, TrackIndex } from "./track";
+import { footprint, type Piece, TrackIndex } from "./track";
 
 /** Pieces can go this far below the floor, for joins that need to be low */
 export const LOWEST_LEVEL = -12;
@@ -57,19 +57,21 @@ export function snapToJoins(
   if (!hasGroove(kind)) return cell;
 
   const others = pieces.filter((piece) => piece.id !== ignoreId);
-  const occupied = new Set(others.map((piece) => cellKey(piece.cell)));
+  const occupied = occupiedCells(others);
   const track = new TrackIndex(others);
+  const fits = (at: Cell) =>
+    footprint({ kind, rotation, cell: at }).every(
+      (part) => !occupied.has(cellKey(part)),
+    );
 
   let best = cell;
-  let bestJoins = occupied.has(cellKey(cell))
-    ? -1
-    : countJoins(track, kind, rotation, cell);
+  let bestJoins = fits(cell) ? countJoins(track, kind, rotation, cell) : -1;
 
   for (let distance = 1; distance <= SNAP_RANGE; distance++) {
     for (const steps of [distance, -distance]) {
       const candidate = slideCell(cell, steps);
       if (candidate.z < LOWEST_LEVEL) continue;
-      if (occupied.has(cellKey(candidate))) continue;
+      if (!fits(candidate)) continue;
       // Something on top would block its groove
       if (occupied.has(cellKey({ ...candidate, z: candidate.z + 1 }))) continue;
       const joins = countJoins(track, kind, rotation, candidate);
@@ -80,4 +82,30 @@ export function snapToJoins(
     }
   }
   return best;
+}
+
+/** Every cell taken up by these pieces */
+export function occupiedCells(pieces: Piece[]): Set<string> {
+  const occupied = new Set<string>();
+  for (const piece of pieces) {
+    for (const cell of footprint(piece)) occupied.add(cellKey(cell));
+  }
+  return occupied;
+}
+
+/** Whether a piece fits at `cell` without overlapping any of `pieces` */
+export function fitsAt(
+  pieces: Piece[],
+  kind: PieceKind,
+  rotation: number,
+  cell: Cell,
+  ignoreId?: string,
+): boolean {
+  if (cell.z < LOWEST_LEVEL) return false;
+  const occupied = occupiedCells(
+    pieces.filter((piece) => piece.id !== ignoreId),
+  );
+  return footprint({ kind, rotation, cell }).every(
+    (part) => !occupied.has(cellKey(part)),
+  );
 }

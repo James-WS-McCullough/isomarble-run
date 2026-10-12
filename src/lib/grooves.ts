@@ -92,6 +92,7 @@ export function grooveCentrelines(
     case "tube":
     case "outlet":
     case "fan":
+    case "seesaw":
       return [];
   }
 }

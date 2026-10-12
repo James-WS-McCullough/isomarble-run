@@ -3,6 +3,7 @@ import {
   DIRECTIONS,
   type Direction,
   oppositeDirection,
+  rotateDirection,
 } from "./directions";
 import { hasGroove, isTube, type PieceKind } from "./pieces";
 import {
@@ -38,6 +39,23 @@ export function createPiece(
   };
 }
 
+/**
+ * The cells a piece takes up. Most fill one; a seesaw's beam reaches over
+ * the cells either side of its stand.
+ */
+export function footprint(
+  piece: Pick<Piece, "kind" | "rotation" | "cell">,
+): Cell[] {
+  const { cell } = piece;
+  if (piece.kind !== "seesaw") return [cell];
+  const v = DIRECTION_VECTORS[rotateDirection("+x", piece.rotation)];
+  return [
+    { x: cell.x - v.x, y: cell.y - v.y, z: cell.z },
+    cell,
+    { x: cell.x + v.x, y: cell.y + v.y, z: cell.z },
+  ];
+}
+
 /** Height of a marble's centre above the centre of the piece it rolls on */
 export function restHeight(kind: PieceKind): number {
   return hasGroove(kind) ? GROOVE_REST_HEIGHT : FLAT_REST_HEIGHT;
@@ -62,7 +80,8 @@ export class TrackIndex {
   constructor(pieces: Piece[]) {
     this.pieces = pieces;
     for (const piece of pieces) {
-      this.byCell.set(cellKey(piece.cell), piece);
+      for (const cell of footprint(piece))
+        this.byCell.set(cellKey(cell), piece);
     }
 
     for (const piece of pieces) {
@@ -70,20 +89,27 @@ export class TrackIndex {
       // Fans and tubes take marbles in through their sides even with more
       // tube stacked on top; other pieces need a clear top
       if (covered && !isTube(piece.kind) && piece.kind !== "fan") continue;
-      const { x, y, z } = piece.cell;
 
-      for (const side of DIRECTIONS) {
-        const v = DIRECTION_VECTORS[side];
-        const key = portKey(x + v.x / 2 - z, y + v.y / 2 - z, side);
-        addTo(this.ports, key, piece);
+      for (const { x, y, z } of footprint(piece)) {
+        for (const side of DIRECTIONS) {
+          const v = DIRECTION_VECTORS[side];
+          // Sides facing the rest of the same piece aren't openings
+          if (
+            this.byCell.get(cellKey({ x: x + v.x, y: y + v.y, z })) === piece
+          ) {
+            continue;
+          }
+          const key = portKey(x + v.x / 2 - z, y + v.y / 2 - z, side);
+          addTo(this.ports, key, piece);
+        }
+
+        if (covered) continue;
+        addTo(
+          this.columns,
+          columnKey(x - z, y - z, restHeight(piece.kind)),
+          piece,
+        );
       }
-
-      if (covered) continue;
-      addTo(
-        this.columns,
-        columnKey(x - z, y - z, restHeight(piece.kind)),
-        piece,
-      );
     }
   }
 
@@ -101,10 +127,11 @@ export class TrackIndex {
    * piece below
    */
   isCovered(piece: Piece): boolean {
-    const { x, y, z } = piece.cell;
-    const above = this.byCell.get(cellKey({ x, y, z: z + 1 }));
-    if (!above) return false;
-    return !isTube(above.kind) || isTube(piece.kind) || piece.kind === "fan";
+    return footprint(piece).some(({ x, y, z }) => {
+      const above = this.byCell.get(cellKey({ x, y, z: z + 1 }));
+      if (!above) return false;
+      return !isTube(above.kind) || isTube(piece.kind) || piece.kind === "fan";
+    });
   }
 
   /**

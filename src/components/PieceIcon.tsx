@@ -44,6 +44,36 @@ export function PieceIcon({
   if (kind === "tube" || kind === "outlet" || kind === "fan") {
     return <SpecialIcon kind={kind} rotation={rotation} />;
   }
+  if (kind === "seesaw") {
+    return (
+      <svg
+        width={SIZE}
+        height={SIZE}
+        viewBox={`0 0 ${SIZE} ${SIZE}`}
+        aria-hidden="true"
+      >
+        <rect
+          x="9"
+          y="27"
+          width="22"
+          height="9"
+          rx="1"
+          fill="#e2bc8a"
+          stroke="#8b5e34"
+        />
+        <rect x="18" y="20" width="4" height="8" fill="#d9a86c" />
+        <path
+          d="M5 26 L35 15"
+          stroke="#b9834d"
+          strokeWidth="3"
+          strokeLinecap="round"
+        />
+        <path d="M3 25 L5 19 L11 19 L12 23" fill="#b9834d" />
+        <path d="M28 18 L29 11 L35 10 L36 15" fill="#b9834d" />
+        <circle cx="8" cy="18" r="3" fill="#4f9fd1" />
+      </svg>
+    );
+  }
 
   return (
     <svg

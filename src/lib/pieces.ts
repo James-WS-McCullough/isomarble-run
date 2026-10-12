@@ -9,7 +9,8 @@ export type PieceKind =
   | "block"
   | "tube"
   | "outlet"
-  | "fan";
+  | "fan"
+  | "seesaw";
 
 interface PieceDefinition {
   kind: PieceKind;
@@ -104,6 +105,16 @@ const PIECE_DEFINITIONS: PieceDefinition[] = [
     label: "Fan",
     hotkey: "9",
     ports: ["+x"],
+    exits: (arriving) => (arriving ? [arriving] : ALL),
+  },
+  {
+    // A seesaw with a cup at each end along x. A marble waits in the low
+    // cup; one landing in the high cup tips it over and flings the waiting
+    // marble into the air.
+    kind: "seesaw",
+    label: "Seesaw",
+    hotkey: "0",
+    ports: [],
     exits: (arriving) => (arriving ? [arriving] : ALL),
   },
 ];

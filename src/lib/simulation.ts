@@ -7,6 +7,7 @@ import {
 import { marbleHeightAt, nearestOnRoute, routeToExit } from "./grooves";
 import { Path, routeBetween } from "./paths";
 import { hasGroove, isTube, pieceExits, piecePorts } from "./pieces";
+import { cupPosition, SEESAW, seesawAxis } from "./seesaw";
 import {
   depthOf,
   fromScreen,
@@ -73,6 +74,8 @@ export interface Marble {
   } | null;
   /** Set while inside a glass tube: the column it's in */
   tube: { x: number; y: number } | null;
+  /** Set while waiting in a seesaw's cup: the seesaw and which end (±1) */
+  held: { piece: Piece; side: number } | null;
   /** Speed along the track while rolling */
   speed: number;
   /** Visible offset left over from a snap, eased away to hide the jump */
@@ -118,6 +121,11 @@ export class Simulation {
   private track = new TrackIndex([]);
   private bounds: Bounds = computeBounds([]);
   private leftoverTime = 0;
+  /** Which end of each seesaw is down, what it holds, and how tipped it is */
+  private readonly seesaws = new Map<
+    string,
+    { down: number; held: Marble | null; tilt: number }
+  >();
   private readonly random: () => number;
 
   constructor(random: () => number = Math.random) {
@@ -130,7 +138,21 @@ export class Simulation {
     this.bounds = computeBounds(pieces);
 
     const byId = new Map(pieces.map((piece) => [piece.id, piece]));
+    for (const [id, seesaw] of this.seesaws) {
+      if (byId.get(id)?.kind !== "seesaw") {
+        this.seesaws.delete(id);
+        if (seesaw.held) seesaw.held.held = null;
+      }
+    }
     for (const marble of this.marbles) {
+      if (marble.held) {
+        const piece = byId.get(marble.held.piece.id);
+        if (piece && samePlacement(piece, marble.held.piece)) {
+          marble.held.piece = piece;
+        } else {
+          marble.held = null;
+        }
+      }
       if (
         marble.tube &&
         this.tubeCell(marble.tube, marble.position.z) === null
@@ -162,6 +184,7 @@ export class Simulation {
       velocity: { x: 0, y: 0, z: 0 },
       rolling: null,
       tube: null,
+      held: null,
       speed: 0,
       visualOffset: { x: 0, y: 0, z: 0 },
       rolled: { x: 0, y: 0 },
@@ -173,6 +196,12 @@ export class Simulation {
 
   clearMarbles() {
     this.marbles = [];
+    for (const seesaw of this.seesaws.values()) seesaw.held = null;
+  }
+
+  /** How far a seesaw is tipped (radians; positive lowers its +1 end) */
+  seesawTilt(pieceId: string): number {
+    return this.seesaws.get(pieceId)?.tilt ?? SEESAW.TILT;
   }
 
   /** Move the simulation forward by `seconds`, in small fixed steps */
@@ -195,6 +224,8 @@ export class Simulation {
         this.stepRolling(marble, dt, events);
       } else if (marble.tube) {
         this.stepInTube(marble, dt, events);
+      } else if (marble.held) {
+        this.stepHeld(marble);
       } else if (!this.stepFlying(marble, dt, events)) {
         events.push({ type: "removed", marbleId: marble.id });
         continue;
@@ -205,6 +236,18 @@ export class Simulation {
 
     this.marbles = kept;
     this.collideMarbles(events);
+
+    for (const seesaw of this.seesaws.values()) {
+      const target = seesaw.down * SEESAW.TILT;
+      seesaw.tilt += clamp(
+        target - seesaw.tilt,
+        -SEESAW.TIP_SPEED * dt,
+        SEESAW.TIP_SPEED * dt,
+      );
+      if (seesaw.held && !this.marbles.includes(seesaw.held)) {
+        seesaw.held = null;
+      }
+    }
   }
 
   /**
@@ -260,6 +303,7 @@ export class Simulation {
   private velocityOf(marble: Marble): Vec3 {
     const rolling = marble.rolling;
     if (marble.tube) return { x: 0, y: 0, z: marble.velocity.z };
+    if (marble.held) return { x: 0, y: 0, z: 0 };
     if (!rolling) return marble.velocity;
     return scale(rolling.path.tangentAt(rolling.distance), marble.speed);
   }
@@ -270,6 +314,8 @@ export class Simulation {
    */
   private setVelocity(marble: Marble, velocity: Vec3) {
     const rolling = marble.rolling;
+    // A marble sitting in a seesaw cup stays put
+    if (marble.held) return;
     if (marble.tube) {
       // Tubes only let marbles move up and down
       marble.velocity = { x: 0, y: 0, z: velocity.z };
@@ -418,7 +464,9 @@ export class Simulation {
       for (let dy = -1; dy <= 1; dy++) {
         for (let dx = -1; dx <= 1; dx++) {
           const cell = { x: centre.x + dx, y: centre.y + dy, z: centre.z + dz };
-          if (!this.track.isOccupied(cell)) continue;
+          const piece = this.track.pieceAt(cell);
+          // A seesaw is mostly open space around its beam and cups
+          if (!piece || piece.kind === "seesaw") continue;
 
           const p = marble.position;
           // Only below the top of the block, and not under it
@@ -581,6 +629,85 @@ export class Simulation {
     return found && { piece: found.piece, point: found.point };
   }
 
+  private seesawState(piece: Piece) {
+    let state = this.seesaws.get(piece.id);
+    if (!state) {
+      state = { down: 1, held: null, tilt: SEESAW.TILT };
+      this.seesaws.set(piece.id, state);
+    }
+    return state;
+  }
+
+  /**
+   * Land in one of a seesaw's cups. The low cup holds one marble. Landing
+   * in the high cup tips the seesaw over: the marble waiting in the other
+   * cup is flung into the air, and the new one waits in its place.
+   */
+  private landOnSeesaw(
+    marble: Marble,
+    piece: Piece,
+    events: SimulationEvent[],
+  ) {
+    const state = this.seesawState(piece);
+    const axis = seesawAxis(piece);
+    const along =
+      (marble.position.x - piece.cell.x) * axis.x +
+      (marble.position.y - piece.cell.y) * axis.y;
+    // Right over the stand, it rolls down into the low cup
+    const side = Math.abs(along) < 0.1 ? state.down : Math.sign(along);
+    const impact = Math.abs(marble.velocity.z);
+    events.push({ type: "land", marbleId: marble.id, impact });
+    events.push({ type: "paint", pieceId: piece.id, hue: marble.hue });
+
+    if (side === state.down && state.held) {
+      // That cup's full: bounce off it
+      marble.velocity = {
+        x: axis.x * side * SEESAW.LAUNCH_OUT,
+        y: axis.y * side * SEESAW.LAUNCH_OUT,
+        z: 2.5,
+      };
+      marble.headingForward = axis.x * side + axis.y * side > 0;
+      return;
+    }
+
+    if (side !== state.down) {
+      // Tip over and fling whatever was waiting in the other cup
+      const waiting = state.held;
+      state.down = side;
+      if (waiting) {
+        waiting.held = null;
+        const out = -side;
+        waiting.velocity = {
+          x: axis.x * out * SEESAW.LAUNCH_OUT,
+          y: axis.y * out * SEESAW.LAUNCH_OUT,
+          z: SEESAW.LAUNCH_UP,
+        };
+        waiting.headingForward = axis.x * out + axis.y * out > 0;
+        waiting.hue =
+          (waiting.hue + 30 + Math.floor(this.random() * 111)) % 360;
+      }
+    }
+
+    state.held = marble;
+    marble.held = { piece, side };
+    marble.velocity = { x: 0, y: 0, z: 0 };
+    marble.rolling = null;
+    marble.tube = null;
+    this.snapTo(marble, cupPosition(piece, side, state.tilt));
+  }
+
+  /** Ride along in a seesaw cup as it tips */
+  private stepHeld(marble: Marble) {
+    const held = marble.held;
+    if (!held) return;
+    const state = this.seesawState(held.piece);
+    if (state.held !== marble) {
+      marble.held = null;
+      return;
+    }
+    marble.position = cupPosition(held.piece, held.side, state.tilt);
+  }
+
   /** Whether there's a tube (or outlet) at this height in a column */
   private tubeAt(column: { x: number; y: number }, z: number): boolean {
     const piece = this.track.pieceAt({ x: column.x, y: column.y, z });
@@ -725,6 +852,12 @@ export class Simulation {
     const { piece, point } = landing;
     const v = marble.velocity;
 
+    if (piece.kind === "seesaw") {
+      marble.position = point;
+      this.landOnSeesaw(marble, piece, events);
+      return;
+    }
+
     // Falling into the top of a tube
     if (isTube(piece.kind)) {
       marble.position = point;
@@ -786,6 +919,15 @@ export class Simulation {
     );
     const throughSide = hasGroove(piece.kind) && !intoOpening;
     const { x, y, z } = piece.cell;
+
+    // Rolling off the track into a seesaw: drop into the cup there
+    if (piece.kind === "seesaw") {
+      const v = DIRECTION_VECTORS[arriving];
+      marble.velocity = { x: v.x * marble.speed, y: v.y * marble.speed, z: 0 };
+      marble.rolling = null;
+      this.landOnSeesaw(marble, piece, events);
+      return;
+    }
 
     // Rolling into an outlet's spout: drop down the tube
     if (piece.kind === "outlet" && intoOpening) {
