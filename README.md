@@ -25,6 +25,9 @@ Pieces: **1** Straight, **2** Curve, **3** Splitter, **4** Crossing, **5** Catch
 | [ / ] | Slide the piece you're placing further away / closer |
 | Space | Play / pause |
 | Ctrl+Z / Ctrl+Y | Undo / redo |
+| Ctrl+S | Save |
+
+**💾 Save** (Ctrl+S) keeps your run in this browser, and **📂 My runs** shows all your saved runs as a grid of thumbnails to open, rename or delete. Your current track is also autosaved, so it's still there when you come back.
 
 Press **Load example** to get the starter track back: Escher's Waterfall, where marbles fall off a tower and roll along a "flat" track back to the top.
 
@@ -74,6 +77,7 @@ src/
   hooks/
     useEditor.ts          Tools, keyboard shortcuts and the undoable track
     useHistory.ts         Undo/redo for any value
+    useSaves.ts           Saved runs in local storage
   lib/
     simulation.ts         Marble physics, landing and the "looks connected" rule
     track.ts              Placed pieces and fast lookups by on-screen position
@@ -84,6 +88,8 @@ src/
     directions.ts         The four horizontal directions
     sound.ts              Web Audio landing taps and speed-matched rolling
     example.ts            The starter track, Escher's Waterfall
+    saves.ts              Saving runs and autosaving the current track
+    placement.ts          Snapping new pieces to the depth where they join up
   three/
     Board.tsx             The 3D scene, pointer handling and build preview
     CameraRig.tsx         Fixed isometric camera with zoom and pan

@@ -25,6 +25,10 @@ interface SidebarProps {
   onRedo: () => void;
   onClearTrack: () => void;
   onLoadExample: () => void;
+  onSave: () => void;
+  onOpenRuns: () => void;
+  /** Name of the saved run being edited, if any */
+  runName: string | null;
 }
 
 const TOOLS: { id: Tool; name: string; icon: string; key: string }[] = [
@@ -49,6 +53,7 @@ const SHORTCUTS: [string, string][] = [
   ["[ / ]", "Slide piece further / closer"],
   ["Space", "Play / pause"],
   ["Ctrl+Z / Ctrl+Y", "Undo / redo"],
+  ["Ctrl+S", "Save"],
 ];
 
 const button =
@@ -177,7 +182,28 @@ export function Sidebar(props: SidebarProps) {
       </Section>
 
       <Section title="Track">
+        {props.runName && (
+          <p className="mb-2 truncate text-xs text-stone-400">
+            Editing{" "}
+            <span className="font-medium text-amber-200">{props.runName}</span>
+          </p>
+        )}
         <div className="grid grid-cols-2 gap-1">
+          <button
+            type="button"
+            onClick={props.onSave}
+            title="Save (Ctrl+S)"
+            className={`${button} bg-amber-600 hover:bg-amber-500 text-stone-950`}
+          >
+            💾 Save
+          </button>
+          <button
+            type="button"
+            onClick={props.onOpenRuns}
+            className={`${button} bg-stone-700 hover:bg-stone-600`}
+          >
+            📂 My runs
+          </button>
           <button
             type="button"
             onClick={props.onUndo}

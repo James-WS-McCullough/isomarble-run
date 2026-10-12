@@ -10,6 +10,7 @@ interface History<T> {
 
 type HistoryAction<T> =
   | { type: "commit"; value: T }
+  | { type: "reset"; value: T }
   | { type: "undo" }
   | { type: "redo" };
 
@@ -27,6 +28,8 @@ function historyReducer<T>(
         present: action.value,
         future: [],
       };
+    case "reset":
+      return { past: [], present: action.value, future: [] };
     case "undo": {
       if (history.past.length === 0) return history;
       return {
@@ -57,6 +60,8 @@ export function useHistory<T>(initial: T) {
   return {
     value: history.present,
     commit: (value: T) => dispatch({ type: "commit", value }),
+    /** Replace the value and forget the undo history */
+    reset: (value: T) => dispatch({ type: "reset", value }),
     undo: () => dispatch({ type: "undo" }),
     redo: () => dispatch({ type: "redo" }),
     canUndo: history.past.length > 0,

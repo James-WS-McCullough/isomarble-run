@@ -1,7 +1,13 @@
 "use client";
 
 import { Environment, Grid, Lightformer } from "@react-three/drei";
-import { Canvas, type ThreeEvent, useFrame } from "@react-three/fiber";
+import {
+  Canvas,
+  type ThreeEvent,
+  useFrame,
+  useThree,
+} from "@react-three/fiber";
+import { useEffect } from "react";
 import type { Object3D } from "three";
 import type { PieceKind } from "@/lib/pieces";
 import type { Simulation, SimulationEvent } from "@/lib/simulation";
@@ -44,6 +50,8 @@ interface BoardProps {
   onClick: (target: BoardTarget) => void;
   onRightClick: (target: BoardTarget) => void;
   onPointerDown: (target: BoardTarget, button: number) => void;
+  /** Receives a function that snapshots the board as a small JPEG */
+  onCaptureReady?: (capture: () => string) => void;
   /** Called every frame the simulation runs, with anything that happened */
   onSimulationEvents: (events: SimulationEvent[]) => void;
 }
@@ -69,6 +77,7 @@ export function Board(props: BoardProps) {
     >
       <CameraRig />
       <Lighting />
+      {props.onCaptureReady && <Snapshotter onReady={props.onCaptureReady} />}
       <SimulationDriver
         simulation={props.simulation}
         playing={props.playing}
@@ -174,6 +183,39 @@ function GhostPiece({ ghost }: { ghost: Ghost }) {
       )}
     </>
   );
+}
+
+const THUMBNAIL_WIDTH = 320;
+
+/** Hands out a function that renders the board into a small JPEG */
+function Snapshotter({
+  onReady,
+}: {
+  onReady: (capture: () => string) => void;
+}) {
+  const { gl, scene, camera } = useThree();
+  useEffect(() => {
+    onReady(() => {
+      gl.render(scene, camera);
+      const source = gl.domElement;
+      const canvas = document.createElement("canvas");
+      canvas.width = THUMBNAIL_WIDTH;
+      canvas.height = Math.round(
+        (THUMBNAIL_WIDTH * source.height) / source.width,
+      );
+      const context = canvas.getContext("2d");
+      if (!context) return "";
+      // The board is drawn over a CSS background, so paint one in
+      const background = context.createLinearGradient(0, 0, 0, canvas.height);
+      background.addColorStop(0, "#1e293b");
+      background.addColorStop(1, "#1c1917");
+      context.fillStyle = background;
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(source, 0, 0, canvas.width, canvas.height);
+      return canvas.toDataURL("image/jpeg", 0.8);
+    });
+  }, [gl, scene, camera, onReady]);
+  return null;
 }
 
 function Lighting() {

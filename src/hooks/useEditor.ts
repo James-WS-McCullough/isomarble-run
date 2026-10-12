@@ -19,6 +19,8 @@ interface Drag {
 interface EditorOptions {
   initialPieces: Piece[];
   onDropMarble: (point: Vec3) => void;
+  /** Turn keyboard shortcuts off, e.g. while a dialog is open */
+  shortcutsEnabled?: boolean;
 }
 
 function sameCell(a: Cell, b: Cell): boolean {
@@ -36,7 +38,11 @@ function sameCell(a: Cell, b: Cell): boolean {
  * Right-click also removes a piece with any tool, and every change can be
  * undone.
  */
-export function useEditor({ initialPieces, onDropMarble }: EditorOptions) {
+export function useEditor({
+  initialPieces,
+  onDropMarble,
+  shortcutsEnabled = true,
+}: EditorOptions) {
   const history = useHistory<Piece[]>(initialPieces);
   const pieces = history.value;
 
@@ -175,7 +181,9 @@ export function useEditor({ initialPieces, onDropMarble }: EditorOptions) {
   // Keyboard shortcuts
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.target instanceof HTMLInputElement) return;
+      if (!shortcutsEnabled || event.target instanceof HTMLInputElement) {
+        return;
+      }
       const key = event.key.toLowerCase();
       const command = event.ctrlKey || event.metaKey;
 
@@ -259,5 +267,7 @@ export function useEditor({ initialPieces, onDropMarble }: EditorOptions) {
     canRedo: history.canRedo,
     clearTrack: () => history.commit([]),
     loadTrack: (track: Piece[]) => history.commit(track),
+    /** Load a track without an undo step back to the old one */
+    replaceTrack: (track: Piece[]) => history.reset(track),
   };
 }
