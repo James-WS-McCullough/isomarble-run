@@ -27,10 +27,17 @@ interface Point {
   y: number;
 }
 
-/** Part of a groove's centreline: a straight segment or a quarter circle */
+/**
+ * Part of a groove: a straight segment or quarter circle along its
+ * centreline, or a round bowl in the middle of the piece
+ */
 export type Centreline =
   | { type: "segment"; from: Point; to: Point }
-  | { type: "arc"; corner: Point };
+  | { type: "arc"; corner: Point }
+  | { type: "bowl"; radius: number };
+
+/** Radius of the round dip in the middle of a catcher */
+export const CATCHER_BOWL_RADIUS = 0.42;
 
 const CENTRE: Point = { x: 0, y: 0 };
 
@@ -75,13 +82,18 @@ export function grooveCentrelines(
         segment(portPoint("+y"), portPoint("-y")),
       ];
     case "catcher":
-      return [segment(CENTRE, portPoint(ports[0]))];
+      // A wide bowl to catch marbles, with a groove leading out
+      return [
+        { type: "bowl", radius: CATCHER_BOWL_RADIUS },
+        segment(CENTRE, portPoint(ports[0])),
+      ];
     case "block":
       return [];
   }
 }
 
 function distanceToCentreline(p: Point, line: Centreline): number {
+  if (line.type === "bowl") return Number.POSITIVE_INFINITY;
   if (line.type === "segment") {
     const dx = line.to.x - line.from.x;
     const dy = line.to.y - line.from.y;
@@ -110,7 +122,7 @@ function distanceToCentreline(p: Point, line: Centreline): number {
   return Math.min(...ends.map((end) => Math.hypot(p.x - end.x, p.y - end.y)));
 }
 
-/** Distance from a point to the nearest groove centreline */
+/** Distance from a point to the nearest groove centreline (bowls aside) */
 export function grooveDistance(lines: Centreline[], p: Point): number {
   let nearest = Number.POSITIVE_INFINITY;
   for (const line of lines) {
@@ -121,10 +133,26 @@ export function grooveDistance(lines: Centreline[], p: Point): number {
 
 /** Height of the wood surface at a point on a piece */
 export function surfaceHeight(lines: Centreline[], p: Point): number {
+  let height = 0.5;
+
   const d = grooveDistance(lines, p);
-  if (d >= GROOVE_HALF_WIDTH) return 0.5;
-  const r = GROOVE_PROFILE_RADIUS;
-  return 0.5 - GROOVE_DEPTH + (r - Math.sqrt(r * r - d * d));
+  if (d < GROOVE_HALF_WIDTH) {
+    const r = GROOVE_PROFILE_RADIUS;
+    height = 0.5 - GROOVE_DEPTH + (r - Math.sqrt(r * r - d * d));
+  }
+
+  // Bowls are a shallow spherical dish, as deep as a groove in the middle
+  for (const line of lines) {
+    if (line.type !== "bowl") continue;
+    const distance = Math.hypot(p.x, p.y);
+    if (distance >= line.radius) continue;
+    const sphere = (line.radius ** 2 + GROOVE_DEPTH ** 2) / (2 * GROOVE_DEPTH);
+    const bowl =
+      0.5 - GROOVE_DEPTH + (sphere - Math.sqrt(sphere ** 2 - distance ** 2));
+    height = Math.min(height, bowl);
+  }
+
+  return height;
 }
 
 /** Height of a marble's centre resting at a point on a piece */

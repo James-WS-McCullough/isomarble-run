@@ -46,6 +46,21 @@ describe("groove shape", () => {
     expect(surfaceHeight(curve, { x: -0.3, y: -0.3 })).toBe(0.5);
   });
 
+  it("gives a catcher a wide round bowl with a groove leading out", () => {
+    const catcher = grooveCentrelines("catcher", 0);
+    const bottom = surfaceHeight(catcher, { x: 0, y: 0 });
+    const side = surfaceHeight(catcher, { x: 0, y: 0.3 });
+    expect(bottom).toBeCloseTo(0.5 - GROOVE_DEPTH);
+    // Partway up the side of the bowl, away from the exit groove
+    expect(side).toBeGreaterThan(bottom);
+    expect(side).toBeLessThan(0.5);
+    expect(surfaceHeight(catcher, { x: 0, y: 0.47 })).toBe(0.5);
+    // The exit groove runs all the way to the +x side
+    expect(surfaceHeight(catcher, { x: 0.49, y: 0 })).toBeCloseTo(
+      0.5 - GROOVE_DEPTH,
+    );
+  });
+
   it("sits a marble in the bottom of the groove, or on top of a rail", () => {
     expect(marbleHeightAt("straight", 0, { x: 0, y: 0 })).toBeCloseTo(
       GROOVE_REST_HEIGHT,

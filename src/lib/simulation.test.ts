@@ -145,6 +145,37 @@ describe("Simulation", () => {
     expect(floor.map((p) => p.id)).toContain(painted[1]);
   });
 
+  it("lands in a catcher it visibly reaches, rather than clipping its back wall", () => {
+    const row = [0, 1, 2, 3].map((y) =>
+      createPiece(y === 0 ? "straight" : "block", 1, { x: 0, y, z: 1 }),
+    );
+    // One level down and one cell past the end of the row
+    const catcher = createPiece("catcher", 3, { x: 0, y: 5, z: 0 });
+    const sim = new Simulation(() => 0);
+    sim.setPieces([...row, catcher]);
+    sim.addMarble(above(row[0].cell));
+
+    expect(paintedIds(run(sim, 3))).toContain(catcher.id);
+  });
+
+  it("rolls off flat blocks over a catcher's rim and out of its exit", () => {
+    const row = [0, 1, 2, 3].map((y) =>
+      createPiece(y === 0 ? "straight" : "block", 1, { x: 0, y, z: 1 }),
+    );
+    // Its opening faces +x, away from the blocks
+    const catcher = createPiece("catcher", 0, { x: 0, y: 4, z: 1 });
+    const sim = new Simulation(() => 0);
+    sim.setPieces([...row, catcher]);
+    const marble = sim.addMarble(above(row[0].cell));
+
+    let leftVia: string | null = null;
+    for (let i = 0; i < 200 && !leftVia; i++) {
+      sim.advance(1 / 60);
+      if (marble.rolling?.piece === catcher) leftVia = marble.rolling.exit;
+    }
+    expect(leftVia).toBe("+x");
+  });
+
   it("treats blocks as solid walls while falling", () => {
     const start = createPiece("straight", 0, { x: 0, y: 0, z: 2 });
     // A tall wall a little way past the end of the track...

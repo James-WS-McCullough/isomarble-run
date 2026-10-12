@@ -215,7 +215,13 @@ export class Simulation {
 
       const next = this.track.findConnection(rolling.piece, rolling.exit);
       if (next) {
-        this.enterPiece(marble, next, rolling.exit, events);
+        this.enterPiece(
+          marble,
+          next,
+          rolling.exit,
+          !hasGroove(rolling.piece.kind),
+          events,
+        );
       } else {
         this.launch(marble, rolling.exit);
       }
@@ -238,13 +244,15 @@ export class Simulation {
     marble.rolled.y += after.y - before.y;
     marble.position = after;
 
-    this.bounceOffWalls(marble, before);
-
-    const landing = this.findLanding(marble, before, marble.position);
+    // Landing on a face it visibly reaches wins over clipping the wall
+    // underneath that face
+    const landing = this.findLanding(marble, before, after);
     if (landing) {
       this.land(marble, landing, events);
       return true;
     }
+
+    this.bounceOffWalls(marble, before);
 
     const { right, up } = screenOf(marble.position);
     if (Math.abs(right) > this.bounds.maxRight) return false;
@@ -381,7 +389,8 @@ export class Simulation {
           B++
         ) {
           for (const piece of this.track.piecesInColumn({ a: A, b: B }, rest)) {
-            const inFront = piece.cell.z + rest > to.z + 0.05;
+            const faceHeight = piece.cell.z + rest - 0.05;
+            const inFront = faceHeight > to.z;
             if (inFront && !marble.headingForward) continue;
 
             // Down the screen (d) and across it (c), relative to the face
@@ -389,17 +398,35 @@ export class Simulation {
             const d1 = a1 - A + (b1 - B);
             const c0 = a0 - A - (b0 - B);
             const c1 = a1 - A - (b1 - B);
-            // Faces behind: land on passing the middle of the face.
-            // Faces in front: land on reaching their back edge.
-            const edge = (c: number) =>
-              inFront ? -1 + Math.abs(c) - FRONT_REACH : 0;
-            const g0 = d0 - edge(c0);
-            const g1 = d1 - edge(c1);
-            if (!(g0 < 0 && g1 >= 0)) continue;
 
-            const f = g0 / (g0 - g1);
+            let f: number;
+            if (!inFront) {
+              // Faces behind: land on passing the middle of the face
+              if (!(d0 < 0 && d1 >= 0)) continue;
+              f = d0 / (d0 - d1);
+            } else {
+              // Faces in front: land on reaching their back edge
+              const edge = (c: number) => -1 + Math.abs(c) - FRONT_REACH;
+              const g0 = d0 - edge(c0);
+              const g1 = d1 - edge(c1);
+              if (g1 < 0) continue;
+              if (g0 < 0) {
+                f = g0 / (g0 - g1);
+              } else if (faceHeight <= from.z) {
+                // The face came in front of the marble just as it reached the
+                // face's back edge (not once it was over the face already)
+                f = (from.z - faceHeight) / (from.z - to.z);
+                if (d0 + (d1 - d0) * f > 0) continue;
+              } else {
+                continue;
+              }
+            }
+
             const c = c0 + (c1 - c0) * f;
+            const d = d0 + (d1 - d0) * f;
             if (Math.abs(c) > (inFront ? 1 : 2 * LANDING_MARGIN)) continue;
+            // Already past the face on screen
+            if (d > 1) continue;
 
             const point = lerp(from, to, f);
             consider(
@@ -434,11 +461,10 @@ export class Simulation {
     };
     const route = routeToExit(piece.kind, piece.rotation, exit);
     const { point: inGroove, next } = nearestOnRoute(route, local);
+    // Follow the shape of the wood as it rolls down into the groove
     const path = pathOnPiece(
       piece,
-      [local, inGroove, ...route.slice(next)],
-      false,
-      piece.cell.z + marbleHeightAt(piece.kind, piece.rotation, local),
+      densify([local, inGroove, ...route.slice(next)]),
     );
 
     marble.speed = Math.min(
@@ -455,25 +481,33 @@ export class Simulation {
     events.push({ type: "paint", pieceId: piece.id, hue: marble.hue });
   }
 
+  /**
+   * Roll onto a piece from a neighbour. `fromFlat` is true when coming off a
+   * flat-topped block, level with the top of the piece rather than down in
+   * a groove.
+   */
   private enterPiece(
     marble: Marble,
     piece: Piece,
     arriving: Direction,
+    fromFlat: boolean,
     events: SimulationEvent[],
   ) {
     const entrySide = oppositeDirection(arriving);
-
-    // A grooved piece with no opening on this side is a solid wall
-    if (
+    const throughSide =
       hasGroove(piece.kind) &&
-      !piecePorts(piece.kind, piece.rotation).includes(entrySide)
-    ) {
-      const edge = pathOnPiece(
-        piece,
-        [DIRECTION_VECTORS[entrySide], DIRECTION_VECTORS[entrySide]].map(
-          (v) => ({ x: v.x / 2, y: v.y / 2 }),
-        ),
-      );
+      !piecePorts(piece.kind, piece.rotation).includes(entrySide);
+
+    // From down in a groove, a side with no opening is a solid wall
+    if (throughSide && !fromFlat) {
+      // Touch the wall at groove height, then head back
+      const v = DIRECTION_VECTORS[entrySide];
+      const wall = {
+        x: piece.cell.x + v.x / 2,
+        y: piece.cell.y + v.y / 2,
+        z: piece.cell.z + restHeight(piece.kind),
+      };
+      const edge = new Path([wall, wall]);
       marble.speed *= PHYSICS.BOUNCE_KEEP;
       this.snapTo(marble, edge.points[0]);
       marble.rolling = { piece, path: edge, distance: 0, exit: entrySide };
@@ -481,7 +515,9 @@ export class Simulation {
     }
 
     const exit = this.pick(pieceExits(piece.kind, piece.rotation, arriving));
-    const route = routeBetween(entrySide, exit);
+    const route = throughSide
+      ? overTheRim(piece, entrySide, exit)
+      : routeBetween(entrySide, exit);
     const path = pathOnPiece(piece, route.points, route.turns);
 
     if (route.turns) marble.speed *= PHYSICS.TURN_KEEP;
@@ -528,26 +564,73 @@ export class Simulation {
 }
 
 /**
- * A path across a piece through points relative to its centre, at resting
- * height. `startHeight` overrides the height of the first point, for a
- * marble that landed off the groove and rolls down into it.
+ * A path across a piece through points relative to its centre, at the
+ * height a marble sits at each point (resting in the groove, or higher up
+ * the side of a bowl)
  */
 function pathOnPiece(
   piece: Piece,
   points: { x: number; y: number }[],
   turns = false,
-  startHeight?: number,
 ): Path {
   const { x, y, z } = piece.cell;
-  const height = z + restHeight(piece.kind);
   return new Path(
-    points.map((p, index) => ({
+    points.map((p) => ({
       x: x + p.x,
       y: y + p.y,
-      z: index === 0 && startHeight !== undefined ? startHeight : height,
+      z: z + marbleHeightAt(piece.kind, piece.rotation, p),
     })),
     turns,
   );
+}
+
+/**
+ * Route for a marble rolling in level with the top of a piece, from a side
+ * with no opening: over the rim and down into the groove (or a catcher's
+ * bowl), then out of the exit. Extra points let it follow the surface.
+ */
+function overTheRim(
+  piece: Piece,
+  from: Direction,
+  to: Direction,
+): { points: { x: number; y: number }[]; turns: boolean } {
+  const start = DIRECTION_VECTORS[from];
+  const end = DIRECTION_VECTORS[to];
+  if (piece.kind === "catcher") {
+    return {
+      points: densify([
+        { x: start.x / 2, y: start.y / 2 },
+        { x: 0, y: 0 },
+        { x: end.x / 2, y: end.y / 2 },
+      ]),
+      turns: false,
+    };
+  }
+  const route = routeBetween(from, to);
+  return { points: densify(route.points), turns: route.turns };
+}
+
+/** Add points along each segment so heights can follow curved surfaces */
+function densify(
+  points: { x: number; y: number }[],
+  spacing = 0.06,
+): { x: number; y: number }[] {
+  const result = [points[0]];
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1];
+    const b = points[i];
+    const steps = Math.max(
+      1,
+      Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / spacing),
+    );
+    for (let k = 1; k <= steps; k++) {
+      result.push({
+        x: a.x + ((b.x - a.x) * k) / steps,
+        y: a.y + ((b.y - a.y) * k) / steps,
+      });
+    }
+  }
+  return result;
 }
 
 function computeBounds(pieces: Piece[]): Bounds {

@@ -54,6 +54,15 @@ export function PieceIcon({
         stroke="#8b5e34"
         strokeWidth="1"
       />
+      {kind === "catcher" && (
+        <polygon
+          points={Array.from({ length: 24 }, (_, i) => {
+            const angle = (i / 24) * Math.PI * 2;
+            return project(0.42 * Math.cos(angle), 0.42 * Math.sin(angle));
+          }).join(" ")}
+          fill="#a2774c"
+        />
+      )}
       {grooves.map((points) => (
         <polyline
           key={points.map((p) => `${p.x},${p.y}`).join(" ")}
@@ -61,7 +70,6 @@ export function PieceIcon({
           fill="none"
           stroke="#a2774c"
           strokeWidth="6"
-          strokeLinecap={kind === "catcher" ? "round" : "butt"}
         />
       ))}
     </svg>
