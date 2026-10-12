@@ -1,105 +1,137 @@
 "use client";
 
-import { useEffect, useReducer, useState } from "react";
-import { IsometricGrid } from "@/components/IsometricGrid";
+import dynamic from "next/dynamic";
+import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
-import { useMarbleSounds } from "@/hooks/useMarbleSounds";
-import { useTrackEditor } from "@/hooks/useTrackEditor";
-import { GRID_CONFIG } from "@/lib/isometric";
-import { EMPTY_WORLD, worldReducer } from "@/lib/world";
+import { useEditor } from "@/hooks/useEditor";
+import { exampleTrack } from "@/lib/example";
+import { Simulation, type SimulationEvent } from "@/lib/simulation";
+import { SoundEngine } from "@/lib/sound";
+import type { Vec3 } from "@/lib/space";
 
-/** Time between simulation steps in auto mode */
-const STEP_INTERVAL_MS = 150;
+// The 3D board only runs in the browser
+const Board = dynamic(
+  () => import("@/three/Board").then((module) => module.Board),
+  { ssr: false },
+);
 
-const BOARD_WIDTH = 800;
-const BOARD_HEIGHT = 600;
+/** Drop marbles a little above the pointer so they land on what you click */
+const DROP_HEIGHT = 0.6;
 
 export default function Home() {
-  const [world, dispatch] = useReducer(worldReducer, EMPTY_WORLD);
-  const { blocks, marbles } = world;
-  const [autoMode, setAutoMode] = useState(false);
+  const [simulation] = useState(() => new Simulation());
+  const [sound] = useState(() => new SoundEngine());
+  const [marbleIds, setMarbleIds] = useState<string[]>([]);
+  const [paint, setPaint] = useState<Record<string, number>>({});
+  const [playing, setPlaying] = useState(true);
+  const [speed, setSpeed] = useState(1);
   const [soundEnabled, setSoundEnabled] = useState(false);
 
-  const editor = useTrackEditor({
-    blocks,
-    updateBlocks: (update) => dispatch({ type: "updateBlocks", update }),
-    addMarble: (position) => dispatch({ type: "addMarble", position }),
-    config: GRID_CONFIG,
+  const dropMarble = (point: Vec3) => {
+    const marble = simulation.addMarble({ ...point, z: point.z + DROP_HEIGHT });
+    setMarbleIds((ids) => [...ids, marble.id]);
+  };
+
+  const [initialPieces] = useState(exampleTrack);
+  const editor = useEditor({
+    initialPieces,
+    onDropMarble: dropMarble,
   });
 
-  useMarbleSounds(marbles, soundEnabled);
+  useEffect(() => {
+    simulation.setPieces(editor.pieces);
+  }, [simulation, editor.pieces]);
 
   useEffect(() => {
-    if (!autoMode) return;
-    const interval = setInterval(
-      () => dispatch({ type: "step" }),
-      STEP_INTERVAL_MS,
-    );
-    return () => clearInterval(interval);
-  }, [autoMode]);
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === " " && !(event.target instanceof HTMLInputElement)) {
+        event.preventDefault();
+        setPlaying((current) => !current);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
-  const countByState = (state: string) =>
-    marbles.filter((marble) => marble.state === state).length;
+  const onSimulationEvents = (events: SimulationEvent[]) => {
+    sound.update(simulation.marbles);
+    if (events.length === 0) return;
+
+    const painted: Record<string, number> = {};
+    const removed = new Set<string>();
+    for (const event of events) {
+      if (event.type === "paint") painted[event.pieceId] = event.hue;
+      else if (event.type === "removed") removed.add(event.marbleId);
+      else if (event.type === "land") sound.tap(event.impact);
+    }
+    if (Object.keys(painted).length > 0) {
+      setPaint((current) => ({ ...current, ...painted }));
+    }
+    if (removed.size > 0) {
+      setMarbleIds((ids) => ids.filter((id) => !removed.has(id)));
+    }
+  };
+
+  const toggleSound = (enabled: boolean) => {
+    setSoundEnabled(enabled);
+    if (enabled) sound.enable();
+    else sound.disable();
+  };
+
+  const clearMarbles = () => {
+    simulation.clearMarbles();
+    setMarbleIds([]);
+  };
 
   return (
-    <div className="min-h-screen bg-gray-900 flex">
+    <div className="h-screen flex bg-stone-950">
       <Sidebar
-        activeTool={editor.tool}
-        onToolChange={editor.setTool}
-        paletteBlock={editor.paletteBlock}
-        onPaletteBlockChange={editor.setPaletteBlock}
-        blockCount={blocks.length}
-        marbleCount={marbles.length}
-        onClearMarbles={() => dispatch({ type: "clearMarbles" })}
-        onResetColours={() => dispatch({ type: "resetColours" })}
-        autoMode={autoMode}
-        onAutoModeChange={setAutoMode}
+        tool={editor.tool}
+        onToolChange={editor.chooseTool}
+        pieceKind={editor.kind}
+        rotation={editor.rotation}
+        onPieceChange={editor.choosePiece}
+        onRotate={() => editor.rotate(1)}
+        playing={playing}
+        onPlayingChange={setPlaying}
+        speed={speed}
+        onSpeedChange={setSpeed}
         soundEnabled={soundEnabled}
-        onSoundEnabledChange={setSoundEnabled}
-        onStep={() => dispatch({ type: "step" })}
+        onSoundEnabledChange={toggleSound}
+        marbleCount={marbleIds.length}
+        pieceCount={editor.pieces.length}
+        onClearMarbles={clearMarbles}
+        onResetColours={() => setPaint({})}
+        canUndo={editor.canUndo}
+        canRedo={editor.canRedo}
+        onUndo={editor.undo}
+        onRedo={editor.redo}
+        onClearTrack={editor.clearTrack}
+        onLoadExample={() => editor.loadTrack(exampleTrack())}
       />
 
-      <main className="flex-1 p-8 overflow-auto">
-        <div className="max-w-7xl mx-auto bg-gray-800 rounded-lg shadow-xl p-6 border border-gray-700">
-          <div className="border border-gray-600 rounded w-fit mx-auto">
-            <IsometricGrid
-              config={GRID_CONFIG}
-              width={BOARD_WIDTH}
-              height={BOARD_HEIGHT}
-              blocks={blocks}
-              marbles={marbles}
-              previewBlock={editor.previewBlock}
-              previewMarble={editor.previewMarble}
-              isAutoMode={autoMode}
-              blocksInteractive={
-                editor.tool === "move" ||
-                editor.tool === "select" ||
-                editor.tool === "deepen"
-              }
-              selectedIds={editor.selectedIds}
-              draggingIds={editor.draggingIds}
-              selectionRect={editor.selectionRect}
-              onPointerDown={editor.onPointerDown}
-              onPointerMove={editor.onPointerMove}
-              onPointerUp={editor.onPointerUp}
-              onPointerLeave={editor.onPointerLeave}
-            />
+      <main className="relative flex-1 bg-gradient-to-b from-slate-800 to-stone-900">
+        <Board
+          simulation={simulation}
+          pieces={editor.displayedPieces}
+          paint={paint}
+          marbleIds={marbleIds}
+          playing={playing}
+          speed={speed}
+          ghost={editor.ghost}
+          highlightedId={editor.highlightedId}
+          draggingId={editor.draggingId}
+          onTargetChange={editor.onTargetChange}
+          onClick={editor.onClick}
+          onRightClick={editor.onRightClick}
+          onPointerDown={editor.onPointerDown}
+          onSimulationEvents={onSimulationEvents}
+        />
+        {!playing && (
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-stone-900/80 text-amber-200 text-sm pointer-events-none">
+            Paused · press Space to play
           </div>
-
-          {marbles.length > 0 && (
-            <div className="mt-6 p-4 bg-gray-700 rounded-lg border border-gray-600">
-              <h2 className="text-sm font-semibold mb-2 text-gray-200">
-                Marble status
-              </h2>
-              <div className="text-sm text-gray-300 flex gap-6">
-                <div>Falling: {countByState("falling")}</div>
-                <div>Rolling: {countByState("rolling")}</div>
-                <div>Behind: {countByState("behind")}</div>
-                <div className="ml-auto">Total: {marbles.length}</div>
-              </div>
-            </div>
-          )}
-        </div>
+        )}
       </main>
     </div>
   );

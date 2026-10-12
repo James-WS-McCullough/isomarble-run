@@ -1,213 +1,252 @@
-import type { Tool } from "@/hooks/useTrackEditor";
-import { BLOCK_TYPES, WALL_SPRITE_PATH } from "@/lib/block-types";
+import type { Tool } from "@/hooks/useEditor";
+import { PIECES, type PieceKind } from "@/lib/pieces";
+import { PieceIcon } from "./PieceIcon";
 
 interface SidebarProps {
-  activeTool: Tool;
+  tool: Tool;
   onToolChange: (tool: Tool) => void;
-  paletteBlock: string;
-  onPaletteBlockChange: (blockName: string) => void;
-  blockCount: number;
-  marbleCount: number;
-  onClearMarbles: () => void;
-  onResetColours: () => void;
-  autoMode: boolean;
-  onAutoModeChange: (enabled: boolean) => void;
+  pieceKind: PieceKind;
+  rotation: number;
+  onPieceChange: (kind: PieceKind) => void;
+  onRotate: () => void;
+  playing: boolean;
+  onPlayingChange: (playing: boolean) => void;
+  speed: number;
+  onSpeedChange: (speed: number) => void;
   soundEnabled: boolean;
   onSoundEnabledChange: (enabled: boolean) => void;
-  onStep: () => void;
+  marbleCount: number;
+  pieceCount: number;
+  onClearMarbles: () => void;
+  onResetColours: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
+  onUndo: () => void;
+  onRedo: () => void;
+  onClearTrack: () => void;
+  onLoadExample: () => void;
 }
 
-const TOOLS: { id: Tool; name: string; icon: string; hint: string }[] = [
-  {
-    id: "place",
-    name: "Place",
-    icon: "🔨",
-    hint: "Click an empty cell to place the selected piece. Click a piece to remove it.",
-  },
-  {
-    id: "move",
-    name: "Move",
-    icon: "✋",
-    hint: "Drag a piece to move it.",
-  },
-  {
-    id: "select",
-    name: "Select",
-    icon: "⬚",
-    hint: "Drag a box to select pieces, then drag the selection to move them together.",
-  },
-  {
-    id: "marble",
-    name: "Marble",
-    icon: "⚪",
-    hint: "Click anywhere to drop a marble.",
-  },
-  {
-    id: "deepen",
-    name: "Deepen",
-    icon: "🕳️",
-    hint: "Left-click a piece to add a wall layer below it. Right-click to remove one.",
-  },
+const TOOLS: { id: Tool; name: string; icon: string; key: string }[] = [
+  { id: "build", name: "Build", icon: "🔨", key: "B" },
+  { id: "move", name: "Move", icon: "✋", key: "V" },
+  { id: "marble", name: "Marble", icon: "🔮", key: "M" },
+  { id: "erase", name: "Erase", icon: "🧽", key: "E" },
 ];
 
-const buttonClass =
-  "px-2 py-1 text-white rounded text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
+const TOOL_HINTS: Record<Tool, string> = {
+  build:
+    "Click to place a piece on the grid or on the side of another piece. R rotates it.",
+  move: "Drag a piece to move it. R rotates the piece under the pointer.",
+  marble: "Click anywhere to drop a marble.",
+  erase: "Click a piece to remove it.",
+};
 
-export function Sidebar({
-  activeTool,
-  onToolChange,
-  paletteBlock,
-  onPaletteBlockChange,
-  blockCount,
-  marbleCount,
-  onClearMarbles,
-  onResetColours,
-  autoMode,
-  onAutoModeChange,
-  soundEnabled,
-  onSoundEnabledChange,
-  onStep,
-}: SidebarProps) {
-  const tool = TOOLS.find((t) => t.id === activeTool) ?? TOOLS[0];
+const SHORTCUTS: [string, string][] = [
+  ["Right-click", "Remove a piece"],
+  ["Scroll", "Zoom"],
+  ["Shift-drag / arrows", "Pan"],
+  ["Space", "Play / pause"],
+  ["Ctrl+Z / Ctrl+Y", "Undo / redo"],
+];
 
+const button =
+  "px-2 py-1 rounded text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed";
+
+export function Sidebar(props: SidebarProps) {
   return (
-    <aside className="w-64 bg-gray-800 border-r border-gray-700 flex flex-col h-screen text-gray-200">
-      <div className="p-3 border-b border-gray-700">
-        <h1 className="text-lg font-semibold text-gray-100">Isomarble Run</h1>
-      </div>
+    <aside
+      className="w-64 shrink-0 bg-stone-900 border-r border-stone-700 flex flex-col h-screen text-stone-200 overflow-y-auto"
+      // Hand keyboard focus back after using a control, so shortcuts like
+      // Space and R keep working on the board
+      onPointerUp={releaseFocus}
+    >
+      <header className="p-3 border-b border-stone-700">
+        <h1 className="text-lg font-semibold text-amber-100">Isomarble Run</h1>
+      </header>
 
-      <section className="p-3 border-b border-gray-700">
-        <h2 className="text-xs font-medium text-gray-300 mb-2">Simulation</h2>
+      <Section title="Marbles">
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={onStep}
-            disabled={marbleCount === 0}
-            className={`${buttonClass} bg-blue-600 hover:bg-blue-700`}
+            onClick={() => props.onPlayingChange(!props.playing)}
+            className={`${button} w-20 bg-amber-600 hover:bg-amber-500 text-stone-950`}
           >
-            Step
+            {props.playing ? "⏸ Pause" : "▶ Play"}
           </button>
           <label className="flex items-center gap-1 text-xs">
             <input
               type="checkbox"
-              checked={autoMode}
-              onChange={(e) => onAutoModeChange(e.target.checked)}
-              className="w-3 h-3"
-            />
-            Auto
-          </label>
-          <label className="flex items-center gap-1 text-xs">
-            <input
-              type="checkbox"
-              checked={soundEnabled}
-              onChange={(e) => onSoundEnabledChange(e.target.checked)}
-              className="w-3 h-3"
+              checked={props.soundEnabled}
+              onChange={(e) => props.onSoundEnabledChange(e.target.checked)}
             />
             Sound
           </label>
         </div>
+        <label className="flex items-center gap-2 mt-2 text-xs">
+          Speed
+          <input
+            type="range"
+            min={0.25}
+            max={2}
+            step={0.25}
+            value={props.speed}
+            onChange={(e) => props.onSpeedChange(Number(e.target.value))}
+            className="flex-1 accent-amber-500"
+          />
+          <span className="w-8 text-right tabular-nums">{props.speed}×</span>
+        </label>
         <div className="grid grid-cols-2 gap-1 mt-2">
           <button
             type="button"
-            onClick={onClearMarbles}
-            disabled={marbleCount === 0}
-            className={`${buttonClass} bg-red-600 hover:bg-red-700`}
+            onClick={props.onClearMarbles}
+            disabled={props.marbleCount === 0}
+            className={`${button} bg-stone-700 hover:bg-stone-600`}
           >
             Clear marbles
           </button>
           <button
             type="button"
-            onClick={onResetColours}
-            disabled={blockCount === 0}
-            className={`${buttonClass} bg-purple-600 hover:bg-purple-700`}
+            onClick={props.onResetColours}
+            disabled={props.pieceCount === 0}
+            className={`${button} bg-stone-700 hover:bg-stone-600`}
           >
             Reset colours
           </button>
         </div>
-      </section>
+      </Section>
 
-      <section className="p-3 border-b border-gray-700">
-        <h2 className="text-xs font-medium text-gray-300 mb-2">Tools</h2>
-        <div className="grid grid-cols-5 gap-1">
-          {TOOLS.map((t) => (
+      <Section title="Tools">
+        <div className="grid grid-cols-4 gap-1">
+          {TOOLS.map((tool) => (
             <button
               type="button"
-              key={t.id}
-              onClick={() => onToolChange(t.id)}
-              aria-pressed={activeTool === t.id}
-              aria-label={t.name}
-              title={t.name}
-              className={`p-2 rounded border transition-all ${
-                activeTool === t.id
-                  ? "border-blue-500 bg-blue-900/30"
-                  : "border-gray-600 bg-gray-700 hover:border-gray-500 hover:bg-gray-600"
+              key={tool.id}
+              onClick={() => props.onToolChange(tool.id)}
+              aria-pressed={props.tool === tool.id}
+              title={`${tool.name} (${tool.key})`}
+              className={`p-2 rounded border text-xs flex flex-col items-center gap-0.5 transition-colors ${
+                props.tool === tool.id
+                  ? "border-amber-500 bg-amber-900/40"
+                  : "border-stone-600 bg-stone-800 hover:bg-stone-700"
               }`}
             >
-              <span className="text-lg">{t.icon}</span>
+              <span className="text-lg">{tool.icon}</span>
+              {tool.name}
             </button>
           ))}
         </div>
-        <p className="mt-2 text-xs text-gray-400">
-          <span className="font-medium text-gray-200">{tool.name}:</span>{" "}
-          {tool.hint}
-        </p>
-        {activeTool !== "place" &&
-          activeTool !== "marble" &&
-          blockCount === 0 && (
-            <p className="mt-2 p-2 bg-amber-900/30 border border-amber-600 rounded text-xs text-amber-200">
-              No pieces yet. Use the Place tool first.
-            </p>
-          )}
-      </section>
+        <p className="mt-2 text-xs text-stone-400">{TOOL_HINTS[props.tool]}</p>
+      </Section>
 
-      {activeTool === "place" && (
-        <section className="p-3 flex-1 overflow-y-auto">
-          <h2 className="text-xs font-medium text-gray-300 mb-2">
-            Track pieces
-          </h2>
-          <div className="grid grid-cols-3 gap-1">
-            {BLOCK_TYPES.map((block) => (
+      <Section title="Pieces">
+        <div className="grid grid-cols-3 gap-1">
+          {PIECES.map((piece) => {
+            const selected =
+              props.tool === "build" && props.pieceKind === piece.kind;
+            return (
               <button
                 type="button"
-                key={block.blockName}
-                onClick={() => onPaletteBlockChange(block.blockName)}
-                aria-pressed={paletteBlock === block.blockName}
-                title={block.label}
-                className={`p-2 border rounded transition-all ${
-                  paletteBlock === block.blockName
-                    ? "border-blue-500 bg-blue-900/30"
-                    : "border-gray-600 bg-gray-700 hover:border-gray-500 hover:bg-gray-600"
+                key={piece.kind}
+                onClick={() => props.onPieceChange(piece.kind)}
+                aria-pressed={selected}
+                title={`${piece.label} (${piece.hotkey})`}
+                className={`p-1 rounded border flex flex-col items-center text-[11px] transition-colors ${
+                  selected
+                    ? "border-amber-500 bg-amber-900/40"
+                    : "border-stone-600 bg-stone-800 hover:bg-stone-700"
                 }`}
               >
-                <img
-                  src={block.blockPath}
-                  alt={block.label}
-                  className="w-8 h-8 mx-auto"
-                  style={{ imageRendering: "pixelated" }}
+                <PieceIcon
+                  kind={piece.kind}
+                  rotation={selected ? props.rotation : 0}
                 />
+                {piece.label}
               </button>
-            ))}
-          </div>
-        </section>
-      )}
+            );
+          })}
+        </div>
+        <button
+          type="button"
+          onClick={props.onRotate}
+          className={`${button} w-full mt-2 bg-stone-700 hover:bg-stone-600`}
+        >
+          ⟳ Rotate (R)
+        </button>
+      </Section>
 
-      {activeTool === "deepen" && (
-        <section className="p-3">
-          <div className="flex items-center gap-2 p-2 bg-gray-700 rounded text-xs">
-            <img
-              src={WALL_SPRITE_PATH}
-              alt=""
-              className="w-6 h-6"
-              style={{ imageRendering: "pixelated" }}
-            />
-            Walls are added below the piece
-          </div>
-        </section>
-      )}
+      <Section title="Track">
+        <div className="grid grid-cols-2 gap-1">
+          <button
+            type="button"
+            onClick={props.onUndo}
+            disabled={!props.canUndo}
+            className={`${button} bg-stone-700 hover:bg-stone-600`}
+          >
+            ↶ Undo
+          </button>
+          <button
+            type="button"
+            onClick={props.onRedo}
+            disabled={!props.canRedo}
+            className={`${button} bg-stone-700 hover:bg-stone-600`}
+          >
+            ↷ Redo
+          </button>
+          <button
+            type="button"
+            onClick={props.onLoadExample}
+            className={`${button} bg-stone-700 hover:bg-stone-600`}
+          >
+            Load example
+          </button>
+          <button
+            type="button"
+            onClick={props.onClearTrack}
+            disabled={props.pieceCount === 0}
+            className={`${button} bg-red-900 hover:bg-red-800`}
+          >
+            Clear track
+          </button>
+        </div>
+      </Section>
 
-      <footer className="mt-auto p-3 border-t border-gray-700 text-xs text-gray-400">
-        {blockCount} pieces · {marbleCount} marbles
+      <Section title="Controls">
+        <dl className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 text-xs">
+          {SHORTCUTS.map(([keys, action]) => (
+            <div key={keys} className="contents">
+              <dt className="text-stone-400">{keys}</dt>
+              <dd>{action}</dd>
+            </div>
+          ))}
+        </dl>
+      </Section>
+
+      <footer className="mt-auto p-3 border-t border-stone-700 text-xs text-stone-400">
+        {props.pieceCount} pieces · {props.marbleCount} marbles
       </footer>
     </aside>
+  );
+}
+
+function releaseFocus() {
+  const focused = document.activeElement;
+  if (focused instanceof HTMLElement) focused.blur();
+}
+
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="p-3 border-b border-stone-700">
+      <h2 className="text-xs font-semibold uppercase tracking-wide text-stone-400 mb-2">
+        {title}
+      </h2>
+      {children}
+    </section>
   );
 }

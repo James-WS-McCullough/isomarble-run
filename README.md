@@ -1,22 +1,31 @@
 # Isomarble Run
 
-An isometric marble run toy. Build a track out of pixel-art blocks, drop some marbles on it and watch them roll, fall and paint the track in their colours.
+An isometric wooden marble run where impossible tracks work. Build a run out of wooden pieces, drop in some glass marbles, and watch them roll, fall and stain the wood their colour. Pieces that only *look* connected really are connected, so you can build Escher-style loops that go downhill forever.
 
 **Play it:** https://james-ws-mccullough.github.io/isomarble-run/
 
-![A marble run with two marbles rolling along a colourful track](docs/screenshot.png)
+![Glass marbles rolling round an endless Penrose staircase made of wooden track pieces](docs/screenshot.png)
 
 ## How to play
 
 | Tool | What it does |
 | --- | --- |
-| 🔨 Place | Pick a piece from the palette and click an empty cell to place it. Click a piece to remove it. |
-| ✋ Move | Drag a piece to move it. |
-| ⬚ Select | Drag a box to select pieces, then drag the selection to move them together. |
-| ⚪ Marble | Click anywhere to drop a marble. |
-| 🕳️ Deepen | Left-click a piece to add a wall layer below it. Right-click to remove one. |
+| 🔨 Build (B) | Click the grid, or the top or side of a piece, to place the selected piece there. **R** rotates it. |
+| ✋ Move (V) | Drag a piece somewhere else. **R** rotates the piece under the pointer. |
+| 🔮 Marble (M) | Click anywhere to drop a marble. |
+| 🧽 Erase (E) | Click a piece to remove it. |
 
-Press **Step** to move the marbles one cell at a time, or tick **Auto** to let them run. Tick **Sound** for rolling and landing sounds.
+Pieces: **1** Straight, **2** Curve, **3** Splitter, **4** Crossing, **5** Catcher, **6** Block.
+
+| Control | Action |
+| --- | --- |
+| Right-click | Remove a piece (any tool) |
+| Scroll | Zoom |
+| Shift-drag, middle-drag or arrow keys | Pan |
+| Space | Play / pause |
+| Ctrl+Z / Ctrl+Y | Undo / redo |
+
+Press **Load example** to get the Penrose staircase back.
 
 ## Running locally
 
@@ -42,38 +51,44 @@ Then open http://localhost:3000.
 
 ## How it works
 
-The board is a 2D grid drawn as an isometric diamond: +x runs down-right and +y runs down-left. Moving +1 in **both** x and y moves straight down the screen by exactly one block, so "falling" is just a step along that diagonal. This is what lets a flat grid look like a 3D structure.
+The world is a real 3D grid (x and y across, z up), drawn with a true isometric camera that looks along the diagonal (−1, −1, −1). From that angle, a point and the point one step along *every* axis, p + (1, 1, 1), land on exactly the same spot on screen. A piece one level down and one step forward looks identical to a piece right next door, and the simulation uses that:
 
-Each simulation step moves every marble exactly one cell, using a small state machine:
+- **"If it looks connected, it is connected."** When a marble reaches the edge of a piece, it rolls onto any piece whose opening lines up on screen, at whatever depth it really is. The marble slides along your line of sight to get there, which is invisible from this camera.
+- **Falling uses real gravity.** Marbles leave the end of a track with their speed, fall in an arc, and land on the first top face they visibly drop onto. A face that is *in front* of the marble doesn't count: the marble drops behind it instead.
+- **Speed is real too, within limits.** Falls speed marbles up, friction slows them back down to a gentle cruising speed on the flat, curves scrub off a little speed, and catchers bounce marbles back. Falling speed is capped, so endless loops settle into a steady pace.
+- Marbles that fall off the bottom of the board come back in at the top. Each marble stains the pieces it rolls over and changes colour every time it starts a new fall.
 
-- **rolling**: the marble is on a block. The block's behaviour (in `block-types.ts`) decides which way it goes next, based on the direction it arrived from.
-- **falling**: there's no block, so the marble drops one cell.
-- **behind**: the marble rolled off the *back* of the track, so it's drawn behind the blocks until it falls clear of them.
-
-Marbles that reach the bottom of the grid wrap back to the top, and marbles that roll off the side are removed. Each marble paints the blocks it rolls over and changes colour every time it starts a new fall.
+Everything is drawn with [three.js](https://threejs.org) via [React Three Fiber](https://r3f.docs.pmnd.rs). The wood and marble textures are generated in code, so there are no image files to download.
 
 ### Project layout
 
 ```
 src/
-  app/page.tsx              Page: wires the world, editor and sound together
+  app/page.tsx            Page: wires the simulation, editor, sound and board together
   components/
-    IsometricGrid.tsx       The board: renders blocks/marbles, reports pointer events
-    IsometricSprite.tsx     One block or wall sprite
-    Marble.tsx              One marble
-    Sidebar.tsx             Tools, palette and simulation controls
+    Sidebar.tsx           Tools, piece palette, simulation and history controls
+    PieceIcon.tsx         Isometric icons for the palette
   hooks/
-    useTrackEditor.ts       Tool state and pointer handling
-    useMarbleSounds.ts      Landing and rolling sounds
+    useEditor.ts          Tools, keyboard shortcuts and the undoable track
+    useHistory.ts         Undo/redo for any value
   lib/
-    block-types.ts          Block definitions and behaviours
-    marble-state-machine.ts How a single marble moves each step
-    world.ts                World state, reducer and simulation step
-    editing.ts              Pure helpers for placing/moving blocks
-    isometric.ts            Grid ↔ screen maths
-public/
-  sprites/                  Block and marble art
-  audio/                    Sound effects
+    simulation.ts         Marble physics, landing and the "looks connected" rule
+    track.ts              Placed pieces and fast lookups by on-screen position
+    pieces.ts             Piece types and where each sends a marble
+    paths.ts              Routes across the top of a piece
+    space.ts              World coordinates and the isometric projection
+    directions.ts         The four horizontal directions
+    sound.ts              Web Audio landing taps and speed-matched rolling
+    example.ts            The Penrose staircase starter track
+  three/
+    Board.tsx             The 3D scene, pointer handling and build preview
+    CameraRig.tsx         Fixed isometric camera with zoom and pan
+    PieceMesh.tsx         A wooden piece
+    Marbles.tsx           Glass marbles that spin as they roll
+    pieceGeometry.ts      Piece shapes, with grooves carved into the top
+    materials.ts          Stained wood and marble materials
+    textures.ts           Procedural wood grain and marble swirl
+public/audio/             Sound effects
 ```
 
 ## Deployment

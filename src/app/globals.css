@@ -10,9 +10,3 @@ body {
   color: #ededed;
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
-
-@keyframes marble-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
