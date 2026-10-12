@@ -70,13 +70,18 @@ export const PHYSICS = {
   AIR_SPEED: 4,
   /** How quickly a fan gets a marble up to speed */
   AIR_ACCELERATION: 30,
-  /** Upward speed a fan gives a marble that rolls or drops onto it: enough
-   * to fly about two tiles up */
-  FAN_KICK: 9,
+  /**
+   * Upward speed a fan gives a marble that rolls or drops onto it: enough to
+   * clear two tiles up comfortably and drop onto them from above
+   */
+  FAN_KICK: 10,
   /** Empty cells a fan's air can cross to suck marbles up a tube above it */
   FAN_REACH: 2,
-  /** How much of its sideways speed a marble keeps when a fan kicks it up */
-  FAN_KEEP: 0.6,
+  /**
+   * Sideways speed of a marble that rolled onto a fan as it's kicked up:
+   * always the same, so it lands about one tile on, two tiles up
+   */
+  FAN_HOP: 2,
   /** Below this horizontal speed a landing marble counts as dropping straight down */
   DROP_SPEED: 0.6,
   /** How quickly small visual snaps are smoothed out */
@@ -958,20 +963,19 @@ export class Simulation {
       return;
     }
 
+    // A marble dropping straight onto the fan goes straight back up
     const v = marble.velocity;
+    const sideways = Math.hypot(v.x, v.y);
+    const hop = sideways < PHYSICS.DROP_SPEED ? 1 : PHYSICS.FAN_HOP / sideways;
     marble.rolling = null;
-    marble.velocity = {
-      x: v.x * PHYSICS.FAN_KEEP,
-      y: v.y * PHYSICS.FAN_KEEP,
-      z: PHYSICS.FAN_KICK,
-    };
+    marble.velocity = { x: v.x * hop, y: v.y * hop, z: PHYSICS.FAN_KICK };
     marble.headingForward = v.x + v.y > 0;
     this.snapTo(marble, from);
   }
 
   /**
    * Rising into the bottom of a tube, or the wide mouth of an upside-down
-   * funnel: caught, and carried up into the column
+   * funnel, anywhere under it: caught, and carried up into the column
    */
   private catchFromBelow(marble: Marble, before: Vec3, after: Vec3): boolean {
     if (after.z <= before.z) return false;
@@ -984,11 +988,6 @@ export class Simulation {
     if (this.tubeAt({ x, y }, level - 1)) return false;
     const mouth = level - 0.5 - FUNNEL_REACH;
     if (before.z >= mouth || after.z < mouth) return false;
-    const radius = isUpsideDown(piece)
-      ? FUNNEL.MOUTH_RADIUS
-      : FUNNEL.NECK_RADIUS;
-    if (Math.hypot(after.x - x, after.y - y) > radius) return false;
-
     this.enterTube(marble, piece, mouth, marble.velocity.z, {
       ...after,
       z: mouth,

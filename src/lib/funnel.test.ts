@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import type { PieceKind } from "./pieces";
 import { Simulation, type SimulationEvent } from "./simulation";
+import type { Cell } from "./space";
 import { createPiece, type Piece } from "./track";
 
 function painted(events: SimulationEvent[], pieces: Piece[]): string[] {
@@ -144,6 +146,45 @@ describe("funnels", () => {
       }
       expect(inTube).toBe(true);
       expect(painted(events, pieces)).toContain(`straight@1,0,${3 + up}`);
+    });
+  }
+
+  // A fan at the end of a track, and two tiles up and one along a corner
+  // that turns off along another track: the jump always lands in the corner
+  // and carries on round it, whichever way the layout faces
+  for (let turn = 0; turn < 4; turn++) {
+    it(`hops a marble up onto a corner two tiles up (turned ${turn})`, () => {
+      const at = (x: number, y: number, z: number) => {
+        let cell = { x, y, z };
+        for (let i = 0; i < turn; i++) cell = { x: -cell.y, y: cell.x, z };
+        return cell;
+      };
+      const piece = (kind: PieceKind, rotation: number, cell: Cell) =>
+        createPiece(kind, (rotation + turn) % 4, cell);
+      const pieces = [
+        piece("catcher", 0, at(-2, 0, 0)),
+        piece("straight", 0, at(-1, 0, 0)),
+        piece("fan", 0, at(0, 0, 0)),
+        piece("block", 0, at(1, 0, 0)),
+        piece("block", 0, at(1, 0, 1)),
+        piece("curve", 2, at(1, 0, 2)),
+        // Just one tile on, so turned layouts don't overlap on screen
+        piece("straight", 1, at(1, -1, 2)),
+      ];
+      const after = pieces[6];
+      for (const random of [0, 0.5, 0.99]) {
+        for (const drop of [0.6, 3]) {
+          const sim = new Simulation(() => random);
+          sim.setPieces(pieces);
+          const start = at(-2, 0, 0);
+          sim.addMarble({ ...start, z: drop + 0.5 });
+          const events: SimulationEvent[] = [];
+          for (let i = 0; i < 180; i++) events.push(...sim.advance(1 / 60));
+          expect(
+            events.some((e) => e.type === "paint" && e.pieceId === after.id),
+          ).toBe(true);
+        }
+      }
     });
   }
 });

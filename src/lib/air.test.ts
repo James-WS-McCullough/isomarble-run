@@ -3,12 +3,12 @@ import { airStreams } from "./air";
 import { createPiece, TrackIndex } from "./track";
 
 describe("air from fans", () => {
-  it("rises two tiles from a fan in the open", () => {
+  it("rises from a fan in the open as high as it kicks marbles", () => {
     const [stream] = airStreams(
       new TrackIndex([createPiece("fan", 0, { x: 0, y: 0, z: 0 })]),
     );
     expect(stream.tubeFrom).toBeNull();
-    expect(stream.to).toBeCloseTo(2.5);
+    expect(stream.to).toBeCloseTo(3);
   });
 
   it("goes all the way up a tube column across a gap", () => {

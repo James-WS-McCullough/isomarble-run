@@ -4,8 +4,8 @@ import { PHYSICS } from "./simulation";
 import { GROOVE_REST_HEIGHT } from "./space";
 import type { TrackIndex } from "./track";
 
-/** How far a fan's air rises in the open: as high as it kicks a marble */
-const OPEN_AIR_RISE = 2;
+/** How far a fan's air rises in the open: about as high as it kicks a marble */
+const OPEN_AIR_RISE = 2.5;
 
 /** A column of air rising from a fan, for drawing */
 export interface AirStream {
