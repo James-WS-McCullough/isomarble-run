@@ -30,15 +30,20 @@ interface Point {
 
 /**
  * Part of a groove: a straight segment or quarter circle along its
- * centreline, or a round bowl in the middle of the piece
+ * centreline, a round bowl in the middle of the piece, or a round
+ * flat-bottomed well there
  */
 export type Centreline =
   | { type: "segment"; from: Point; to: Point }
   | { type: "arc"; corner: Point }
-  | { type: "bowl"; radius: number };
+  | { type: "bowl"; radius: number }
+  | { type: "well"; radius: number; depth: number };
 
 /** Radius of the round dip in the middle of a catcher */
 export const CATCHER_BOWL_RADIUS = 0.42;
+
+/** The well in the middle of a fan's crossroads that the fan sits in */
+export const FAN_WELL = { RADIUS: 0.3, DEPTH: 0.3 };
 
 const CENTRE: Point = { x: 0, y: 0 };
 
@@ -88,18 +93,26 @@ export function grooveCentrelines(
         { type: "bowl", radius: CATCHER_BOWL_RADIUS },
         segment(CENTRE, portPoint(ports[0])),
       ];
+    case "fan":
+      // A crossroads, with the fan set into a well where the grooves meet
+      return [
+        segment(portPoint("+x"), portPoint("-x")),
+        segment(portPoint("+y"), portPoint("-y")),
+        { type: "well", radius: FAN_WELL.RADIUS, depth: FAN_WELL.DEPTH },
+      ];
     case "block":
     case "tube":
     case "outlet":
     case "funnel":
-    case "fan":
     case "seesaw":
       return [];
   }
 }
 
 function distanceToCentreline(p: Point, line: Centreline): number {
-  if (line.type === "bowl") return Number.POSITIVE_INFINITY;
+  if (line.type === "bowl" || line.type === "well") {
+    return Number.POSITIVE_INFINITY;
+  }
   if (line.type === "segment") {
     const dx = line.to.x - line.from.x;
     const dy = line.to.y - line.from.y;
@@ -149,6 +162,15 @@ export function surfaceHeight(lines: Centreline[], p: Point): number {
 
   // Bowls are a shallow spherical dish, as deep as a groove in the middle
   for (const line of lines) {
+    if (line.type === "well") {
+      // Straight down, with a slight bevel round the edge
+      const distance = Math.hypot(p.x, p.y);
+      const bevel = 0.03;
+      if (distance >= line.radius) continue;
+      const f = Math.min(1, (line.radius - distance) / bevel);
+      height = Math.min(height, 0.5 - line.depth * f);
+      continue;
+    }
     if (line.type !== "bowl") continue;
     const distance = Math.hypot(p.x, p.y);
     if (distance >= line.radius) continue;

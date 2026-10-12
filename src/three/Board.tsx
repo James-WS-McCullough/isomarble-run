@@ -13,6 +13,7 @@ import type { PieceKind } from "@/lib/pieces";
 import type { Simulation, SimulationEvent } from "@/lib/simulation";
 import type { Cell, Vec3 } from "@/lib/space";
 import { footprint, type Piece } from "@/lib/track";
+import { AirParticles } from "./AirParticles";
 import { CameraRig } from "./CameraRig";
 import { Marbles } from "./Marbles";
 import { PieceMesh } from "./PieceMesh";
@@ -121,6 +122,8 @@ export function Board(props: BoardProps) {
           ))}
         </group>
       </SimulationContext.Provider>
+
+      <AirParticles pieces={pieces} />
 
       {props.ghost && <GhostPiece ghost={props.ghost} />}
 

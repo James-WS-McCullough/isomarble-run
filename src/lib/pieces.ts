@@ -109,12 +109,12 @@ const PIECE_DEFINITIONS: PieceDefinition[] = [
     exits: () => ["+x"],
   },
   {
-    // Blows marbles up the tubes stacked on top of it. Marbles roll in
-    // through the intake on its side.
+    // A crossroads with a fan set into the middle: marbles that roll or
+    // drop onto it are blown upwards, and up any tube above it
     kind: "fan",
     label: "Fan",
     hotkey: "9",
-    ports: ["+x"],
+    ports: ALL,
     exits: (arriving) => (arriving ? [arriving] : ALL),
   },
   {
@@ -163,7 +163,7 @@ export function pieceExits(
  * their sides without openings are walls. Tubes count: their sides are glass.
  */
 export function hasGroove(kind: PieceKind): boolean {
-  return kind !== "block" && kind !== "fan";
+  return kind !== "block";
 }
 
 /** Glass tubes, which marbles travel up and down inside */

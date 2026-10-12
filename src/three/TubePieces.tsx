@@ -4,6 +4,7 @@ import { useFrame } from "@react-three/fiber";
 import { useRef } from "react";
 import * as THREE from "three";
 import { FUNNEL } from "@/lib/funnel";
+import { FAN_WELL } from "@/lib/grooves";
 import { GROOVE_REST_HEIGHT } from "@/lib/space";
 import {
   getPieceMaterial,
@@ -189,30 +190,49 @@ export function GlassFunnel({ look, raycast, upsideDown }: TubeProps) {
   );
 }
 
-const grilleGeometry = new THREE.CircleGeometry(0.3, 32);
-grilleGeometry.rotateX(-Math.PI / 2);
-const bladeGeometry = new THREE.BoxGeometry(0.26, 0.015, 0.07);
+// The fan sits in the well where the crossroads' grooves meet
+const wellFloor = 0.5 - FAN_WELL.DEPTH;
+const floorGeometry = new THREE.CircleGeometry(FAN_WELL.RADIUS, 32);
+floorGeometry.rotateX(-Math.PI / 2);
+const bladeGeometry = new THREE.BoxGeometry(0.22, 0.012, 0.08);
 bladeGeometry.translate(0.13, 0, 0);
-const intakeGeometry = new THREE.CircleGeometry(0.24, 24, 0, Math.PI);
-// A half-round hole at the top of the +x face
-intakeGeometry.rotateZ(Math.PI);
-intakeGeometry.rotateY(Math.PI / 2);
+const hubGeometry = new THREE.CylinderGeometry(0.05, 0.06, 0.05, 16);
+// A guard over the blades: a ring and two crossed bars
+const guardRingGeometry = new THREE.TorusGeometry(
+  FAN_WELL.RADIUS - 0.03,
+  0.012,
+  6,
+  32,
+);
+guardRingGeometry.rotateX(Math.PI / 2);
+const guardInnerGeometry = new THREE.TorusGeometry(0.13, 0.01, 6, 24);
+guardInnerGeometry.rotateX(Math.PI / 2);
+const guardBarGeometry = new THREE.BoxGeometry(
+  2 * (FAN_WELL.RADIUS - 0.03),
+  0.014,
+  0.02,
+);
 const darkMaterial = new THREE.MeshStandardMaterial({
   color: "#2a1d14",
   roughness: 0.9,
 });
 const bladeMaterial = new THREE.MeshStandardMaterial({
-  color: "#c9c2b8",
-  roughness: 0.4,
-  metalness: 0.4,
+  color: "#d8d2c8",
+  roughness: 0.35,
+  metalness: 0.5,
+});
+const brassMaterial = new THREE.MeshStandardMaterial({
+  color: "#c9a25e",
+  roughness: 0.35,
+  metalness: 0.7,
 });
 
-/** A wooden block with a spinning fan on top and an intake on its +x side */
+/** A wooden crossroads with a spinning fan set into the middle */
 export function Fan({ hue, look, raycast }: TubeProps) {
-  const block = getPieceGeometry("block");
+  const block = getPieceGeometry("fan");
   const blades = useRef<THREE.Group>(null);
   useFrame((_, delta) => {
-    if (blades.current) blades.current.rotation.y += delta * 12;
+    if (blades.current) blades.current.rotation.y += delta * 14;
   });
 
   return (
@@ -228,28 +248,49 @@ export function Fan({ hue, look, raycast }: TubeProps) {
         raycast={() => null}
       />
       <mesh
-        geometry={grilleGeometry}
+        geometry={floorGeometry}
         material={darkMaterial}
-        position={[0, 0.502, 0]}
+        position={[0, wellFloor + 0.003, 0]}
         raycast={() => null}
       />
-      <group ref={blades} position={[0, 0.52, 0]}>
-        {[0, 1, 2, 3].map((i) => (
+      <group ref={blades} position={[0, wellFloor + 0.05, 0]}>
+        <mesh
+          geometry={hubGeometry}
+          material={brassMaterial}
+          raycast={() => null}
+        />
+        {[0, 1, 2, 3, 4].map((i) => (
           <mesh
             key={i}
             geometry={bladeGeometry}
             material={bladeMaterial}
-            rotation={[0.3, (i * Math.PI) / 2, 0]}
+            // Pitched along their length, like a propeller
+            rotation={[0.35, (i * Math.PI * 2) / 5, 0, "YXZ"]}
             raycast={() => null}
           />
         ))}
       </group>
-      <mesh
-        geometry={intakeGeometry}
-        material={darkMaterial}
-        position={[0.502, 0.5, 0]}
-        raycast={() => null}
-      />
+      <group position={[0, wellFloor + 0.1, 0]}>
+        <mesh
+          geometry={guardRingGeometry}
+          material={brassMaterial}
+          raycast={() => null}
+        />
+        <mesh
+          geometry={guardInnerGeometry}
+          material={brassMaterial}
+          raycast={() => null}
+        />
+        {[0, 1].map((i) => (
+          <mesh
+            key={i}
+            geometry={guardBarGeometry}
+            material={brassMaterial}
+            rotation={[0, (i * Math.PI) / 2, 0]}
+            raycast={() => null}
+          />
+        ))}
+      </group>
     </>
   );
 }

@@ -41,12 +41,7 @@ export function PieceIcon({
     project(-0.5, 0.5),
   ];
 
-  if (
-    kind === "tube" ||
-    kind === "outlet" ||
-    kind === "funnel" ||
-    kind === "fan"
-  ) {
+  if (kind === "tube" || kind === "outlet" || kind === "funnel") {
     return <SpecialIcon kind={kind} rotation={rotation} />;
   }
   if (kind === "seesaw") {
@@ -93,15 +88,7 @@ export function PieceIcon({
         stroke="#8b5e34"
         strokeWidth="1"
       />
-      {kind === "catcher" && (
-        <polygon
-          points={Array.from({ length: 24 }, (_, i) => {
-            const angle = (i / 24) * Math.PI * 2;
-            return project(0.42 * Math.cos(angle), 0.42 * Math.sin(angle));
-          }).join(" ")}
-          fill="#a2774c"
-        />
-      )}
+      {kind === "catcher" && <polygon points={circle(0.42)} fill="#a2774c" />}
       {grooves.map((points) => (
         <polyline
           key={points.map((p) => `${p.x},${p.y}`).join(" ")}
@@ -111,19 +98,43 @@ export function PieceIcon({
           strokeWidth="6"
         />
       ))}
+      {kind === "fan" && (
+        <>
+          <polygon points={circle(0.3)} fill="#2a1d14" />
+          <polygon points={circle(0.27)} fill="none" stroke="#c9a25e" />
+          <polyline
+            points={[project(-0.22, 0), project(0.22, 0)].join(" ")}
+            stroke="#d8d2c8"
+            strokeWidth="2"
+          />
+          <polyline
+            points={[project(0, -0.22), project(0, 0.22)].join(" ")}
+            stroke="#d8d2c8"
+            strokeWidth="2"
+          />
+        </>
+      )}
     </svg>
   );
 }
 
-/** Side-on icons for tubes and fans */
+/** An isometric circle of radius r on the top face */
+function circle(r: number): string {
+  return Array.from({ length: 24 }, (_, i) => {
+    const angle = (i / 24) * Math.PI * 2;
+    return project(r * Math.cos(angle), r * Math.sin(angle));
+  }).join(" ");
+}
+
+/** Side-on icons for tubes, outlets and funnels */
 function SpecialIcon({
   kind,
   rotation,
 }: {
-  kind: "tube" | "outlet" | "funnel" | "fan";
+  kind: "tube" | "outlet" | "funnel";
   rotation: number;
 }) {
-  // Which way the spout or intake points on screen: right for +x and -y
+  // Which way the spout points on screen: right for +x and -y
   const ports = piecePorts(kind, rotation);
   const right = ports[0] === "+x" || ports[0] === "-y";
   const glass = { fill: "#dff1fb", fillOpacity: 0.35, stroke: "#9fc6dc" };
@@ -134,32 +145,7 @@ function SpecialIcon({
       viewBox={`0 0 ${SIZE} ${SIZE}`}
       aria-hidden="true"
     >
-      {kind === "fan" ? (
-        <>
-          <rect
-            x="10"
-            y="14"
-            width="20"
-            height="20"
-            rx="2"
-            fill="#e2bc8a"
-            stroke="#8b5e34"
-          />
-          <ellipse cx="20" cy="14" rx="9" ry="3" fill="#2a1d14" />
-          <path
-            d="M14 13 L26 15 M14 15 L26 13"
-            stroke="#c9c2b8"
-            strokeWidth="1.5"
-          />
-          <path
-            d="M20 10 L20 3 M17 6 L20 3 L23 6"
-            stroke="#7dd3fc"
-            strokeWidth="1.5"
-            fill="none"
-          />
-          <circle cx={right ? 30 : 10} cy="17" r="3" fill="#2a1d14" />
-        </>
-      ) : kind === "funnel" ? (
+      {kind === "funnel" ? (
         // Upside down, it's flipped and the marble goes up through it
         <g transform={rotation % 2 === 1 ? "matrix(1 0 0 -1 0 40)" : undefined}>
           <path d="M5 5 L35 5 L27 18 L13 18 Z" {...glass} />

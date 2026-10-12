@@ -20,7 +20,7 @@ Pieces: **1** Straight, **2** Curve, **3** Splitter, **4** Crossing, **5** Catch
 - **🧪 Tube**: a vertical glass pipe. Marbles that fall in the top drop down inside it and land on whatever is below.
 - **↪️ Outlet**: a tube with a spout. Marbles blown up to it shoot out of the spout onto the track; marbles rolling into the spout drop down the tube.
 - **🥤 Funnel**: a wide glass mouth on a tube. Marbles that land anywhere on it, or roll in over its rim, spiral down into the tube below. Press **R** to turn it upside down, so its mouth catches marbles blown up from below.
-- **🌀 Fan**: a jump pad. Marbles that roll or drop onto it get blown about two tiles up. If they rise into the bottom of a tube (or an upside-down funnel) on the way, the fan sucks them up the whole column like a vacuum, out of the first outlet or the open top. Marbles dropped into a column above a fan sink to the bottom first, then get blown back up.
+- **🌀 Fan**: a crossroads with a fan set into the middle, so marbles can roll onto it from any side, and wisps of air show where it blows. It works as a jump pad. Marbles that roll or drop onto it get blown about two tiles up. If they rise into the bottom of a tube (or an upside-down funnel) on the way, the fan sucks them up the whole column like a vacuum, out of the first outlet or the open top. Marbles dropped into a column above a fan sink to the bottom first, then get blown back up.
 - **⚖️ Seesaw**: three tiles long, with a stand in the middle and a cup over each end. A marble waits in the low cup; when another lands (or rolls) into the high cup, it tips over and flings the waiting marble into the air, and the new one waits in its place, ready to go again.
 
 | Control | Action |
@@ -99,6 +99,7 @@ src/
     placement.ts          Snapping new pieces to the depth where they join up
     seesaw.ts             Cup seesaw geometry, shared by the physics and the model
     funnel.ts             Funnel shape, shared by the physics and the model
+    air.ts                Where the air from each fan rises, for drawing it
   three/
     Board.tsx             The 3D scene, pointer handling and build preview
     CameraRig.tsx         Fixed isometric camera with zoom and pan
@@ -107,6 +108,7 @@ src/
     pieceGeometry.ts      Piece models, with rounded grooves carved into the top
     TubePieces.tsx        Glass tubes, outlets, funnels and fans
     SeesawMesh.tsx        The cup seesaw, tipping with the simulation
+    AirParticles.tsx      Air rising from fans and through the tubes they blow
     materials.ts          Stained wood and marble materials
     textures.ts           Procedural wood grain and marble swirl
 public/audio/             Sound effects
