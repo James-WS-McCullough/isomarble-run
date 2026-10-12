@@ -3,8 +3,8 @@
 import { useFrame } from "@react-three/fiber";
 import { useRef } from "react";
 import * as THREE from "three";
-import { FUNNEL } from "@/lib/funnel";
-import { FAN_WELL } from "@/lib/grooves";
+import { FUNNEL, isUpsideDown } from "@/lib/funnel";
+import { FAN_WELL } from "@/lib/pieces";
 import { GROOVE_REST_HEIGHT } from "@/lib/space";
 import {
   getPieceMaterial,
@@ -97,11 +97,10 @@ function glass(look: PieceLook): THREE.Material {
 }
 
 interface TubeProps {
+  rotation: number;
   hue?: number;
   look: PieceLook;
   raycast?: () => null;
-  /** For funnels: mouth down, to catch marbles blown up from below */
-  upsideDown?: boolean;
 }
 
 /** A straight glass tube with wooden collars at each end */
@@ -169,7 +168,9 @@ const rimGeometry = new THREE.TorusGeometry(FUNNEL.MOUTH_RADIUS, 0.03, 8, 40);
 rimGeometry.rotateX(Math.PI / 2);
 
 /** A wide glass funnel with a wooden rim, narrowing into a tube */
-export function GlassFunnel({ look, raycast, upsideDown }: TubeProps) {
+export function GlassFunnel({ rotation, look, raycast }: TubeProps) {
+  // Turned an odd number of times, it's upside down
+  const upsideDown = isUpsideDown({ kind: "funnel", rotation });
   return (
     <group rotation={[upsideDown ? Math.PI : 0, 0, 0]}>
       <mesh geometry={coneGeometry} material={glass(look)} raycast={raycast} />

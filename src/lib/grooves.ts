@@ -1,9 +1,12 @@
+import { CENTRE, type Centreline, type Point, portPoint } from "./centrelines";
+import { type Direction, oppositeDirection } from "./directions";
 import {
-  DIRECTION_VECTORS,
-  type Direction,
-  oppositeDirection,
-} from "./directions";
-import { hasGroove, isTube, type PieceKind, piecePorts } from "./pieces";
+  grooveCentrelines,
+  isFlatTopped,
+  isTube,
+  type PieceKind,
+  piecePorts,
+} from "./pieces";
 import {
   FLAT_REST_HEIGHT,
   GROOVE_DEPTH,
@@ -14,100 +17,15 @@ import {
 } from "./space";
 
 /**
- * The shape of the grooves carved into each piece. The same shape is used
- * to build the 3D model and to work out how high a marble sits, so marbles
- * always sit snugly in the groove.
+ * The shape of the wood carved by each piece's grooves. The same shape is
+ * used to build the 3D model and to work out how high a marble sits, so
+ * marbles always sit snugly in the groove.
  *
  * Coordinates are relative to the piece centre, with the top of the piece
- * at height 0.5. A groove runs along a centreline and has a rounded
- * cross-section: part of a circle of radius GROOVE_PROFILE_RADIUS.
+ * at height 0.5. A groove runs along a centreline (see centrelines.ts) and
+ * has a rounded cross-section: part of a circle of radius
+ * GROOVE_PROFILE_RADIUS.
  */
-
-interface Point {
-  x: number;
-  y: number;
-}
-
-/**
- * Part of a groove: a straight segment or quarter circle along its
- * centreline, a round bowl in the middle of the piece, or a round
- * flat-bottomed well there
- */
-export type Centreline =
-  | { type: "segment"; from: Point; to: Point }
-  | { type: "arc"; corner: Point }
-  | { type: "bowl"; radius: number }
-  | { type: "well"; radius: number; depth: number };
-
-/** Radius of the round dip in the middle of a catcher */
-export const CATCHER_BOWL_RADIUS = 0.42;
-
-/** The well in the middle of a fan's crossroads that the fan sits in */
-export const FAN_WELL = { RADIUS: 0.3, DEPTH: 0.3 };
-
-const CENTRE: Point = { x: 0, y: 0 };
-
-function portPoint(side: Direction): Point {
-  const v = DIRECTION_VECTORS[side];
-  return { x: v.x / 2, y: v.y / 2 };
-}
-
-/** Quarter circle of radius 0.5 joining two adjacent sides */
-function arcBetween(a: Direction, b: Direction): Centreline {
-  const pa = portPoint(a);
-  const pb = portPoint(b);
-  return { type: "arc", corner: { x: pa.x + pb.x, y: pa.y + pb.y } };
-}
-
-function segment(from: Point, to: Point): Centreline {
-  return { type: "segment", from, to };
-}
-
-/** The centrelines of every groove on a rotated piece */
-export function grooveCentrelines(
-  kind: PieceKind,
-  rotation: number,
-): Centreline[] {
-  const ports = piecePorts(kind, rotation);
-  switch (kind) {
-    case "straight":
-      return [segment(portPoint(ports[0]), portPoint(ports[1]))];
-    case "curve":
-      return [arcBetween(ports[0], ports[1])];
-    case "tee":
-      // Straight through, plus curved branches out of the side opening
-      return [
-        segment(portPoint(ports[1]), portPoint(ports[2])),
-        segment(CENTRE, portPoint(ports[0])),
-        arcBetween(ports[0], ports[1]),
-        arcBetween(ports[0], ports[2]),
-      ];
-    case "cross":
-      return [
-        segment(portPoint("+x"), portPoint("-x")),
-        segment(portPoint("+y"), portPoint("-y")),
-      ];
-    case "catcher":
-      // A wide bowl to catch marbles, with a groove leading out
-      return [
-        { type: "bowl", radius: CATCHER_BOWL_RADIUS },
-        segment(CENTRE, portPoint(ports[0])),
-      ];
-    case "fan":
-      // A crossroads, with the fan set into a well where the grooves meet
-      return [
-        segment(portPoint("+x"), portPoint("-x")),
-        segment(portPoint("+y"), portPoint("-y")),
-        { type: "well", radius: FAN_WELL.RADIUS, depth: FAN_WELL.DEPTH },
-      ];
-    case "block":
-    case "tube":
-    case "outlet":
-    case "funnel":
-    case "seesaw":
-      return [];
-  }
-}
 
 function distanceToCentreline(p: Point, line: Centreline): number {
   if (line.type === "bowl" || line.type === "well") {
@@ -189,11 +107,16 @@ export function marbleHeightAt(
   rotation: number,
   p: Point,
 ): number {
-  if (!hasGroove(kind)) return FLAT_REST_HEIGHT;
+  if (isFlatTopped(kind)) return FLAT_REST_HEIGHT;
   // Marbles leave and enter tubes level with the track
   if (isTube(kind)) return GROOVE_REST_HEIGHT;
   const lines = grooveCentrelines(kind, rotation);
   return Math.min(FLAT_REST_HEIGHT, surfaceHeight(lines, p) + MARBLE_RADIUS);
+}
+
+/** Whether a piece has a bowl in the middle, like a catcher */
+export function hasBowl(kind: PieceKind): boolean {
+  return grooveCentrelines(kind, 0).some((line) => line.type === "bowl");
 }
 
 /**
@@ -210,7 +133,9 @@ export function routeToExit(
   if (ports.includes(opposite)) {
     return [portPoint(opposite), portPoint(exit)];
   }
-  if (kind === "curve") {
+  // No groove runs through the middle of a curve: follow it round
+  const lines = grooveCentrelines(kind, rotation);
+  if (lines.length > 0 && grooveDistance(lines, CENTRE) > 0.01) {
     const other = ports.find((port) => port !== exit) ?? opposite;
     return quarterCircle(other, exit);
   }

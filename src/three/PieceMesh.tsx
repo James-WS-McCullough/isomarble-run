@@ -1,6 +1,6 @@
 "use client";
 
-import { isUpsideDown } from "@/lib/funnel";
+import type { ComponentType } from "react";
 import type { PieceKind } from "@/lib/pieces";
 import { type Cell, toThree } from "@/lib/space";
 import {
@@ -24,6 +24,29 @@ interface PieceMeshProps {
   pickable?: boolean;
 }
 
+/** What a piece with its own model is drawn with */
+export interface ModelProps {
+  /** Piece id, so moving parts can follow the simulation */
+  pieceId?: string;
+  /** Quarter turns: the model is already turned, but some flip too */
+  rotation: number;
+  hue?: number;
+  look: PieceLook;
+  raycast?: () => null;
+}
+
+/**
+ * Pieces with their own model. Every other piece is a wooden block with its
+ * grooves carved into the top.
+ */
+const MODELS: Partial<Record<PieceKind, ComponentType<ModelProps>>> = {
+  tube: GlassTube,
+  outlet: GlassOutlet,
+  funnel: GlassFunnel,
+  fan: Fan,
+  seesaw: Seesaw,
+};
+
 const ignoreRaycast = () => null;
 
 export function PieceMesh({
@@ -42,33 +65,16 @@ export function PieceMesh({
     userData: { pieceId },
   };
 
-  if (kind === "seesaw") {
+  const Model = MODELS[kind];
+  if (Model) {
     return (
       <group {...placement}>
-        <Seesaw pieceId={pieceId} hue={hue} look={look} raycast={raycast} />
-      </group>
-    );
-  }
-
-  if (
-    kind === "tube" ||
-    kind === "outlet" ||
-    kind === "funnel" ||
-    kind === "fan"
-  ) {
-    const Special = {
-      tube: GlassTube,
-      outlet: GlassOutlet,
-      funnel: GlassFunnel,
-      fan: Fan,
-    }[kind];
-    return (
-      <group {...placement}>
-        <Special
+        <Model
+          pieceId={pieceId}
+          rotation={rotation}
           hue={hue}
           look={look}
           raycast={raycast}
-          upsideDown={isUpsideDown({ kind, rotation })}
         />
       </group>
     );

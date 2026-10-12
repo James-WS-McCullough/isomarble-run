@@ -5,7 +5,13 @@ import {
   oppositeDirection,
   rotateDirection,
 } from "./directions";
-import { hasGroove, isTube, type PieceKind } from "./pieces";
+import {
+  isFlatTopped,
+  isTube,
+  joinsTubeAbove,
+  type PieceKind,
+  pieceLength,
+} from "./pieces";
 import {
   type Cell,
   cellKey,
@@ -40,25 +46,25 @@ export function createPiece(
 }
 
 /**
- * The cells a piece takes up. Most fill one; a seesaw's beam reaches over
- * the cells either side of its stand.
+ * The cells a piece takes up: its own, and for a long piece (like a
+ * seesaw's beam) the cells either side of it along its x axis
  */
 export function footprint(
   piece: Pick<Piece, "kind" | "rotation" | "cell">,
 ): Cell[] {
   const { cell } = piece;
-  if (piece.kind !== "seesaw") return [cell];
+  const reach = (pieceLength(piece.kind) - 1) / 2;
   const v = DIRECTION_VECTORS[rotateDirection("+x", piece.rotation)];
-  return [
-    { x: cell.x - v.x, y: cell.y - v.y, z: cell.z },
-    cell,
-    { x: cell.x + v.x, y: cell.y + v.y, z: cell.z },
-  ];
+  const cells: Cell[] = [];
+  for (let i = -reach; i <= reach; i++) {
+    cells.push({ x: cell.x + v.x * i, y: cell.y + v.y * i, z: cell.z });
+  }
+  return cells;
 }
 
 /** Height of a marble's centre above the centre of the piece it rolls on */
 export function restHeight(kind: PieceKind): number {
-  return hasGroove(kind) ? GROOVE_REST_HEIGHT : FLAT_REST_HEIGHT;
+  return isFlatTopped(kind) ? FLAT_REST_HEIGHT : GROOVE_REST_HEIGHT;
 }
 
 export const REST_HEIGHTS = [GROOVE_REST_HEIGHT, FLAT_REST_HEIGHT];
@@ -112,7 +118,7 @@ export class TrackIndex {
       const covered = this.isCovered(piece);
       // Fans and tubes take marbles in through their sides even with more
       // tube stacked on top; other pieces need a clear top
-      if (covered && !isTube(piece.kind) && piece.kind !== "fan") continue;
+      if (covered && !joinsTubeAbove(piece.kind)) continue;
 
       for (const { x, y, z } of footprint(piece)) {
         for (const side of DIRECTIONS) {
@@ -202,7 +208,7 @@ export class TrackIndex {
     return footprint(piece).some(({ x, y, z }) => {
       const above = this.byCell.get(cellKey({ x, y, z: z + 1 }));
       if (!above) return false;
-      return !isTube(above.kind) || isTube(piece.kind) || piece.kind === "fan";
+      return !isTube(above.kind) || joinsTubeAbove(piece.kind);
     });
   }
 

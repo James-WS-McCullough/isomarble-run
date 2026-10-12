@@ -1,5 +1,5 @@
 import { DIRECTIONS, oppositeDirection } from "./directions";
-import { hasGroove, type PieceKind, piecePorts } from "./pieces";
+import { isFlatTopped, type PieceKind, piecePorts } from "./pieces";
 import { type Cell, cellKey } from "./space";
 import { footprint, type Piece, TrackIndex } from "./track";
 
@@ -24,14 +24,14 @@ export function countJoins(
   rotation: number,
   cell: Cell,
 ): number {
-  const sides = hasGroove(kind) ? piecePorts(kind, rotation) : DIRECTIONS;
+  const sides = isFlatTopped(kind) ? DIRECTIONS : piecePorts(kind, rotation);
   let joins = 0;
   for (const side of sides) {
     const neighbour = track.findConnectionFrom(cell, side);
     if (!neighbour) continue;
     const opening = oppositeDirection(side);
     if (
-      !hasGroove(neighbour.kind) ||
+      isFlatTopped(neighbour.kind) ||
       piecePorts(neighbour.kind, neighbour.rotation).includes(opening)
     ) {
       joins += 1;
@@ -54,7 +54,7 @@ export function snapToJoins(
   ignoreId?: string,
 ): Cell {
   // Plain blocks have no grooves to join up, so they go where they're put
-  if (!hasGroove(kind)) return cell;
+  if (isFlatTopped(kind)) return cell;
 
   const others = pieces.filter((piece) => piece.id !== ignoreId);
   const occupied = occupiedCells(others);

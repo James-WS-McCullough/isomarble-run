@@ -1,4 +1,4 @@
-import { FAN_WELL } from "./grooves";
+import { FAN_WELL } from "./pieces";
 import { GROOVE_REST_HEIGHT } from "./space";
 import type { TrackIndex } from "./track";
 

@@ -3,7 +3,7 @@ import {
   type Direction,
   oppositeDirection,
 } from "../directions";
-import { marbleHeightAt } from "../grooves";
+import { hasBowl, marbleHeightAt } from "../grooves";
 import { Path, routeBetween } from "../paths";
 import { pieceExits } from "../pieces";
 import type { Piece } from "../track";
@@ -51,7 +51,7 @@ export function overTheRim(
 ): { points: Point[]; turns: boolean } {
   const start = DIRECTION_VECTORS[from];
   const end = DIRECTION_VECTORS[to];
-  if (piece.kind === "catcher") {
+  if (hasBowl(piece.kind)) {
     return {
       points: densify([
         { x: start.x / 2, y: start.y / 2 },

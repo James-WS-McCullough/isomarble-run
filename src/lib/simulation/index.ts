@@ -4,10 +4,9 @@ import {
   directionOfVelocity,
   oppositeDirection,
 } from "../directions";
-import { isUpsideDown } from "../funnel";
 import { nearestOnRoute, routeToExit } from "../grooves";
 import { Path, routeBetween } from "../paths";
-import { hasGroove, isTube, pieceExits, piecePorts } from "../pieces";
+import { isFlatTopped, isTube, pieceExits, piecePorts } from "../pieces";
 import {
   depthOf,
   fromScreen,
@@ -17,6 +16,7 @@ import {
   type Vec3,
 } from "../space";
 import { type Piece, restHeight, TrackIndex } from "../track";
+import { BEHAVIOURS, type World } from "./behaviours";
 import { collideMarbles } from "./collisions";
 import { findLanding } from "./landing";
 import {
@@ -32,13 +32,7 @@ import {
 import { PHYSICS } from "./physics";
 import { densify, overTheRim, pathOnPiece, pick } from "./routes";
 import { Seesaws } from "./seesaws";
-import {
-  blowUp,
-  catchFromBelow,
-  enterTube,
-  stepInTube,
-  tubeCell,
-} from "./tubes";
+import { catchFromBelow, stepInTube, tubeCell } from "./tubes";
 import { clamp, scale } from "./vector";
 import { bounceOffWalls } from "./walls";
 
@@ -84,6 +78,11 @@ export class Simulation {
   constructor(random: () => number = Math.random) {
     this.random = random;
     this.seesaws = new Seesaws(random);
+  }
+
+  /** What special pieces' behaviours can reach */
+  private get world(): World {
+    return { track: this.track, seesaws: this.seesaws };
   }
 
   /** Replace the track. Marbles on pieces that changed fall off. */
@@ -217,7 +216,7 @@ export class Simulation {
           marble,
           next,
           rolling.exit,
-          !hasGroove(rolling.piece.kind),
+          isFlatTopped(rolling.piece.kind),
           events,
         );
       } else {
@@ -272,37 +271,14 @@ export class Simulation {
   /** Come down on a piece from the air */
   private land(marble: Marble, landing: Landing, events: SimulationEvent[]) {
     const { piece, point } = landing;
+    const special = BEHAVIOURS[piece.kind]?.land;
+    if (special) {
+      special(this.world, marble, landing, events);
+      return;
+    }
+
+    // Settle into its groove, and roll out the way it was heading
     const v = marble.velocity;
-
-    if (piece.kind === "seesaw") {
-      marble.position = point;
-      this.seesaws.land(marble, piece, events);
-      return;
-    }
-
-    // Dropping onto a fan: blown back up
-    if (piece.kind === "fan") {
-      events.push({
-        type: "land",
-        marbleId: marble.id,
-        impact: Math.abs(v.z),
-      });
-      blowUp(this.track, marble, piece, point, events);
-      return;
-    }
-
-    // Falling into the top of a tube, or anywhere on a funnel
-    if (isTube(piece.kind)) {
-      marble.position = point;
-      enterTube(marble, piece, point.z, Math.min(v.z, 0), point);
-      events.push({
-        type: "land",
-        marbleId: marble.id,
-        impact: Math.abs(v.z) / 3,
-      });
-      return;
-    }
-
     const horizontal = Math.hypot(v.x, v.y);
     const arriving = directionOfVelocity(v.x, v.y, PHYSICS.DROP_SPEED);
     const exit = pick(
@@ -356,62 +332,25 @@ export class Simulation {
     fromFlat: boolean,
     events: SimulationEvent[],
   ) {
+    const special = BEHAVIOURS[piece.kind]?.rollIn;
+    if (special?.(this.world, marble, piece, arriving, events)) return;
+
     const entrySide = oppositeDirection(arriving);
     const intoOpening = piecePorts(piece.kind, piece.rotation).includes(
       entrySide,
     );
-    const throughSide = hasGroove(piece.kind) && !intoOpening;
-    const { x, y, z } = piece.cell;
-    const heading = DIRECTION_VECTORS[arriving];
-    const side = DIRECTION_VECTORS[entrySide];
-    // Where it comes in, level with the track
-    const edge = {
-      x: x + side.x / 2,
-      y: y + side.y / 2,
-      z: z + restHeight(piece.kind),
-    };
-    const goOnFlying = () => {
-      marble.motion = FLYING;
-      marble.velocity = {
-        x: heading.x * marble.speed,
-        y: heading.y * marble.speed,
-        z: 0,
-      };
-    };
-
-    // Rolling off the track into a seesaw: drop into the cup there
-    if (piece.kind === "seesaw") {
-      goOnFlying();
-      this.seesaws.land(marble, piece, events);
-      return;
-    }
-
-    // Rolling in over a funnel's rim: circle down into it
-    if (piece.kind === "funnel" && !isUpsideDown(piece)) {
-      goOnFlying();
-      enterTube(marble, piece, edge.z, -0.01, edge);
-      events.push({ type: "paint", pieceId: piece.id, hue: marble.hue });
-      return;
-    }
-
-    // Rolling into an outlet's spout: drop down the tube
-    if (piece.kind === "outlet" && intoOpening) {
-      enterTube(marble, piece, z + restHeight(piece.kind), -0.5);
-      events.push({ type: "paint", pieceId: piece.id, hue: marble.hue });
-      return;
-    }
-
-    // Rolling onto a fan, from any side: blown upwards
-    if (piece.kind === "fan") {
-      goOnFlying();
-      blowUp(this.track, marble, piece, edge, events);
-      return;
-    }
+    const throughSide = !isFlatTopped(piece.kind) && !intoOpening;
 
     // From down in a groove, a side with no opening is a solid wall, and
     // the glass sides of a tube always are
     if (throughSide && (!fromFlat || isTube(piece.kind))) {
       // Touch the wall at groove height, then head back
+      const side = DIRECTION_VECTORS[entrySide];
+      const edge = {
+        x: piece.cell.x + side.x / 2,
+        y: piece.cell.y + side.y / 2,
+        z: piece.cell.z + restHeight(piece.kind),
+      };
       const wall = new Path([edge, edge]);
       marble.speed *= PHYSICS.BOUNCE_KEEP;
       snapTo(marble, wall.points[0]);

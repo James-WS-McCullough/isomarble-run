@@ -1,6 +1,7 @@
 import * as THREE from "three";
-import { grooveCentrelines, surfaceHeight } from "@/lib/grooves";
+import { surfaceHeight } from "@/lib/grooves";
 import type { PieceKind } from "@/lib/pieces";
+import { grooveCentrelines } from "@/lib/pieces";
 import { GROOVE_DEPTH } from "@/lib/space";
 
 /**

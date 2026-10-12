@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
-  grooveCentrelines,
   marbleHeightAt,
   nearestOnRoute,
   routeToExit,
   surfaceHeight,
 } from "./grooves";
+import { grooveCentrelines } from "./pieces";
 import {
   FLAT_REST_HEIGHT,
   GROOVE_DEPTH,

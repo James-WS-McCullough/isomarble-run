@@ -90,6 +90,7 @@ src/
       index.ts            The simulation: stepping marbles, landing and rolling onto pieces
       marble.ts           A marble and what it's doing (flying, rolling, in a tube, held)
       landing.ts          Where a falling marble lands: the "looks connected" rule
+      behaviours.ts       What special pieces do when a marble lands or rolls in
       tubes.ts            Tubes, funnels, outlets and fans
       seesaws.ts          Cup seesaws
       collisions.ts       Marbles bumping into each other
@@ -97,7 +98,8 @@ src/
       routes.ts           Paths across pieces
       physics.ts          Tuning: gravity, speeds and bounciness
     track.ts              Placed pieces and fast lookups by on-screen position
-    pieces.ts             Piece types and where each sends a marble
+    pieces.ts             Every kind of piece: its shape, openings and rules
+    centrelines.ts        Building blocks for the grooves carved into pieces
     grooves.ts            Groove shapes, shared by the 3D models and the physics
     paths.ts              Routes across the top of a piece
     space.ts              World coordinates and the isometric projection
@@ -122,6 +124,18 @@ src/
     textures.ts           Procedural wood grain and marble swirl
 public/audio/             Sound effects
 ```
+
+### Adding a piece
+
+1. **`src/lib/pieces.ts`**: add the kind and its definition: label, hotkey,
+   openings, where it sends marbles, the grooves carved into it, and any
+   traits (flat top, part of a tube column, open space, more than one tile
+   long).
+2. **`src/lib/simulation/behaviours.ts`**: only if it does something special
+   when a marble lands on it or rolls into it.
+3. **`src/three/PieceMesh.tsx`** and **`src/components/PieceIcon.tsx`**: only
+   if it needs its own model or icon. Otherwise it's drawn as a wooden block
+   with its grooves carved in.
 
 ## Deployment
 

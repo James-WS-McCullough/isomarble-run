@@ -1,3 +1,4 @@
+import { isSolid } from "../pieces";
 import { MARBLE_RADIUS, type Vec3 } from "../space";
 import type { TrackIndex } from "../track";
 import type { Marble } from "./marble";
@@ -21,8 +22,8 @@ export function bounceOffWalls(
       for (let dx = -1; dx <= 1; dx++) {
         const cell = { x: centre.x + dx, y: centre.y + dy, z: centre.z + dz };
         const piece = track.pieceAt(cell);
-        // A seesaw is mostly open space around its beam and cups
-        if (!piece || piece.kind === "seesaw") continue;
+        // Some pieces, like a seesaw, are mostly open space
+        if (!piece || !isSolid(piece.kind)) continue;
 
         const p = marble.position;
         // Only below the top of the block, and not under it
