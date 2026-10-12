@@ -26,6 +26,34 @@ export class Path {
     this.length = this.lengths[this.lengths.length - 1];
   }
 
+  /** Direction of travel (a unit vector) a distance `s` along the path */
+  tangentAt(s: number): Vec3 {
+    for (let i = 1; i < this.points.length; i++) {
+      if (s <= this.lengths[i] || i === this.points.length - 1) {
+        const a = this.points[i - 1];
+        const b = this.points[i];
+        const length = Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
+        if (length > 1e-9) {
+          return {
+            x: (b.x - a.x) / length,
+            y: (b.y - a.y) / length,
+            z: (b.z - a.z) / length,
+          };
+        }
+      }
+    }
+    return { x: 0, y: 0, z: 0 };
+  }
+
+  /** The way back: from a distance `s` along the path to its start */
+  backFrom(s: number): Vec3[] {
+    const points = [this.pointAt(s)];
+    for (let i = this.points.length - 1; i >= 0; i--) {
+      if (this.lengths[i] < s) points.push(this.points[i]);
+    }
+    return points;
+  }
+
   /** The point a distance `s` along the path */
   pointAt(s: number): Vec3 {
     if (s <= 0) return this.points[0];

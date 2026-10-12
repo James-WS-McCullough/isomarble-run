@@ -39,6 +39,8 @@ export const PHYSICS = {
   BOUNCE_KEEP: 0.45,
   /** Share of speed kept bouncing off the side of a piece */
   WALL_BOUNCE: 0.4,
+  /** How bouncy marbles are when they hit each other (1 is perfectly) */
+  MARBLE_BOUNCE: 0.9,
   /** Below this horizontal speed a landing marble counts as dropping straight down */
   DROP_SPEED: 0.6,
   /** How quickly small visual snaps are smoothed out */
@@ -61,6 +63,8 @@ export interface Marble {
     path: Path;
     distance: number;
     exit: Direction;
+    /** Side it rolled in from, or null if it landed on the piece */
+    entry: Direction | null;
   } | null;
   /** Speed along the track while rolling */
   speed: number;
@@ -78,6 +82,7 @@ export interface Marble {
 export type SimulationEvent =
   | { type: "land"; marbleId: string; impact: number }
   | { type: "paint"; pieceId: string; hue: number }
+  | { type: "hit"; impact: number }
   | { type: "removed"; marbleId: string };
 
 /** How far from the middle of a face (0.5 is its corner) a marble can land */
@@ -183,6 +188,117 @@ export class Simulation {
     }
 
     this.marbles = kept;
+    this.collideMarbles(events);
+  }
+
+  /**
+   * Marbles bump into each other. Two marbles collide when they visibly
+   * overlap and either really touch, or are rolling along track that is
+   * visibly joined (even if the join hides a change in depth). Marbles that
+   * only overlap because one is passing in front of the other don't.
+   */
+  private collideMarbles(events: SimulationEvent[]) {
+    const reach = 2 * MARBLE_RADIUS;
+    for (let i = 0; i < this.marbles.length; i++) {
+      for (let j = i + 1; j < this.marbles.length; j++) {
+        const a = this.marbles[i];
+        const b = this.marbles[j];
+        const apart = subtract(a.position, b.position);
+        const seen = visiblePart(apart);
+        const seenDistance = length(seen);
+        if (seenDistance >= reach) continue;
+
+        const distance = length(apart);
+        const touching = distance < reach;
+        if (!touching && !this.onJoinedTrack(a, b)) continue;
+
+        const normal = touching
+          ? scale(apart, 1 / Math.max(distance, 1e-9))
+          : scale(seen, 1 / Math.max(seenDistance, 1e-9));
+        const va = this.velocityOf(a);
+        const vb = this.velocityOf(b);
+        const closing = dot(subtract(va, vb), normal);
+        if (closing >= 0) continue;
+
+        // Equal masses: swap the parts of their velocities along the normal
+        const impulse = (-(1 + PHYSICS.MARBLE_BOUNCE) / 2) * closing;
+        this.setVelocity(a, add(va, scale(normal, impulse)));
+        this.setVelocity(b, subtract(vb, scale(normal, impulse)));
+        events.push({ type: "hit", impact: -closing });
+      }
+    }
+  }
+
+  /** Both rolling on the same piece, or on pieces that visibly join */
+  private onJoinedTrack(a: Marble, b: Marble): boolean {
+    const ra = a.rolling;
+    const rb = b.rolling;
+    if (!ra || !rb) return false;
+    return (
+      ra.piece === rb.piece ||
+      this.track.findConnection(ra.piece, ra.exit) === rb.piece ||
+      this.track.findConnection(rb.piece, rb.exit) === ra.piece
+    );
+  }
+
+  private velocityOf(marble: Marble): Vec3 {
+    const rolling = marble.rolling;
+    if (!rolling) return marble.velocity;
+    return scale(rolling.path.tangentAt(rolling.distance), marble.speed);
+  }
+
+  /**
+   * Give a marble a new velocity. A rolling marble keeps only the part along
+   * its groove, turning round if that points backwards.
+   */
+  private setVelocity(marble: Marble, velocity: Vec3) {
+    const rolling = marble.rolling;
+    if (!rolling) {
+      marble.velocity = velocity;
+      return;
+    }
+    const along = dot(velocity, rolling.path.tangentAt(rolling.distance));
+    if (along >= 0) {
+      marble.speed = along;
+    } else {
+      this.turnAround(marble);
+      marble.speed = -along;
+    }
+  }
+
+  /** Roll back the way it came */
+  private turnAround(marble: Marble) {
+    const rolling = marble.rolling;
+    if (!rolling) return;
+    const { piece } = rolling;
+
+    if (rolling.entry) {
+      const path = new Path(rolling.path.backFrom(rolling.distance));
+      marble.rolling = {
+        piece,
+        path,
+        distance: 0,
+        exit: rolling.entry,
+        entry: rolling.exit,
+      };
+      return;
+    }
+
+    // It landed here, so head out the other way through the middle
+    const exit = this.pick(
+      pieceExits(piece.kind, piece.rotation, oppositeDirection(rolling.exit)),
+    );
+    const here = rolling.path.pointAt(rolling.distance);
+    const v = DIRECTION_VECTORS[exit];
+    const path = pathOnPiece(
+      piece,
+      densify([
+        { x: here.x - piece.cell.x, y: here.y - piece.cell.y },
+        { x: 0, y: 0 },
+        { x: v.x / 2, y: v.y / 2 },
+      ]),
+    );
+    marble.rolling = { piece, path, distance: 0, exit, entry: null };
   }
 
   private stepRolling(marble: Marble, dt: number, events: SimulationEvent[]) {
@@ -475,7 +591,7 @@ export class Simulation {
     marble.velocity = { x: 0, y: 0, z: 0 };
     marble.position = point;
     this.snapTo(marble, path.points[0]);
-    marble.rolling = { piece, path, distance: 0, exit };
+    marble.rolling = { piece, path, distance: 0, exit, entry: null };
 
     events.push({ type: "land", marbleId: marble.id, impact: Math.abs(v.z) });
     events.push({ type: "paint", pieceId: piece.id, hue: marble.hue });
@@ -510,7 +626,13 @@ export class Simulation {
       const edge = new Path([wall, wall]);
       marble.speed *= PHYSICS.BOUNCE_KEEP;
       this.snapTo(marble, edge.points[0]);
-      marble.rolling = { piece, path: edge, distance: 0, exit: entrySide };
+      marble.rolling = {
+        piece,
+        path: edge,
+        distance: 0,
+        exit: entrySide,
+        entry: null,
+      };
       return;
     }
 
@@ -524,7 +646,7 @@ export class Simulation {
     if (entrySide === exit) marble.speed *= PHYSICS.BOUNCE_KEEP;
 
     this.snapTo(marble, path.points[0]);
-    marble.rolling = { piece, path, distance: 0, exit };
+    marble.rolling = { piece, path, distance: 0, exit, entry: entrySide };
     events.push({ type: "paint", pieceId: piece.id, hue: marble.hue });
   }
 
@@ -676,6 +798,14 @@ function add(a: Vec3, b: Vec3): Vec3 {
 
 function subtract(a: Vec3, b: Vec3): Vec3 {
   return { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z };
+}
+
+function dot(a: Vec3, b: Vec3): number {
+  return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+function length(v: Vec3): number {
+  return Math.hypot(v.x, v.y, v.z);
 }
 
 function scale(v: Vec3, factor: number): Vec3 {

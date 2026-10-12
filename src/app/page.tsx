@@ -157,7 +157,9 @@ export default function Home() {
     for (const event of events) {
       if (event.type === "paint") painted[event.pieceId] = event.hue;
       else if (event.type === "removed") removed.add(event.marbleId);
-      else if (event.type === "land") sound.tap(event.impact);
+      else if (event.type === "land" || event.type === "hit") {
+        sound.tap(event.impact);
+      }
     }
     if (Object.keys(painted).length > 0) {
       setPaint((current) => ({ ...current, ...painted }));
