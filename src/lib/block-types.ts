@@ -1,3 +1,6 @@
+import { assetPath } from "./assets";
+import type { GridPosition } from "./isometric";
+
 /**
  * Marble momentum directions for the state machine
  */
@@ -20,21 +23,35 @@ export interface ConditionalOutput {
 }
 
 /**
- * Block behavior definition
+ * Block behaviour definition. When an output lists several directions the
+ * marble picks one at random.
  */
 export interface BlockBehavior {
-  blockPath: string;
   blockName: string;
+  /** Human-readable name, e.g. "Turn X Minus Y" */
+  label: string;
+  blockPath: string;
   defaultOutputMomentum: MomentumDirection | MomentumDirection[];
-  conditionalOutputs?: ConditionalOutput[];
+  conditionalOutputs: ConditionalOutput[];
 }
 
 /**
- * Registry of all block types and their behaviors
+ * A block placed on the grid
  */
-export const BLOCK_TYPES: BlockBehavior[] = [
+export interface Block {
+  id: string;
+  position: GridPosition;
+  blockName: string;
+  /** Colour painted by the last marble to roll over it (0-360) */
+  hue?: number;
+  /** Number of wall layers drawn below the block */
+  height: number;
+}
+
+type BlockDefinition = Omit<BlockBehavior, "label" | "blockPath">;
+
+const BLOCK_DEFINITIONS: BlockDefinition[] = [
   {
-    blockPath: "/sprites/isometric-cubes/CrissCross.png",
     blockName: "CrissCross",
     defaultOutputMomentum: ["+x", "-x", "+y", "-y"],
     conditionalOutputs: [
@@ -45,8 +62,7 @@ export const BLOCK_TYPES: BlockBehavior[] = [
     ],
   },
   {
-    blockPath: "/sprites/isometric-cubes/StrightY.png",
-    blockName: "StrightY",
+    blockName: "StraightY",
     defaultOutputMomentum: ["-y", "+y"],
     conditionalOutputs: [
       { inputMomentum: "+y", outputMomentum: "+y" },
@@ -54,8 +70,7 @@ export const BLOCK_TYPES: BlockBehavior[] = [
     ],
   },
   {
-    blockPath: "/sprites/isometric-cubes/StrightX.png",
-    blockName: "StrightX",
+    blockName: "StraightX",
     defaultOutputMomentum: ["+x", "-x"],
     conditionalOutputs: [
       { inputMomentum: "-x", outputMomentum: "-x" },
@@ -63,31 +78,26 @@ export const BLOCK_TYPES: BlockBehavior[] = [
     ],
   },
   {
-    blockPath: "/sprites/isometric-cubes/LandingPlusY.png",
     blockName: "LandingPlusY",
     defaultOutputMomentum: "+y",
     conditionalOutputs: [],
   },
   {
-    blockPath: "/sprites/isometric-cubes/LandingMinusY.png",
     blockName: "LandingMinusY",
     defaultOutputMomentum: "-y",
     conditionalOutputs: [],
   },
   {
-    blockPath: "/sprites/isometric-cubes/LandingMinusX.png",
     blockName: "LandingMinusX",
     defaultOutputMomentum: "-x",
     conditionalOutputs: [],
   },
   {
-    blockPath: "/sprites/isometric-cubes/LandingPlusX.png",
     blockName: "LandingPlusX",
     defaultOutputMomentum: "+x",
     conditionalOutputs: [],
   },
   {
-    blockPath: "/sprites/isometric-cubes/TurnXY.png",
     blockName: "TurnXY",
     defaultOutputMomentum: ["+x", "+y"],
     conditionalOutputs: [
@@ -96,7 +106,6 @@ export const BLOCK_TYPES: BlockBehavior[] = [
     ],
   },
   {
-    blockPath: "/sprites/isometric-cubes/TurnXMinusY.png",
     blockName: "TurnXMinusY",
     defaultOutputMomentum: ["+x", "-y"],
     conditionalOutputs: [
@@ -105,7 +114,6 @@ export const BLOCK_TYPES: BlockBehavior[] = [
     ],
   },
   {
-    blockPath: "/sprites/isometric-cubes/TurnYMinusX.png",
     blockName: "TurnYMinusX",
     defaultOutputMomentum: ["+y", "-x"],
     conditionalOutputs: [
@@ -114,7 +122,6 @@ export const BLOCK_TYPES: BlockBehavior[] = [
     ],
   },
   {
-    blockPath: "/sprites/isometric-cubes/TurnMinusXMinusY.png",
     blockName: "TurnMinusXMinusY",
     defaultOutputMomentum: ["-x", "-y"],
     conditionalOutputs: [
@@ -123,7 +130,6 @@ export const BLOCK_TYPES: BlockBehavior[] = [
     ],
   },
   {
-    blockPath: "/sprites/isometric-cubes/TPlusX.png",
     blockName: "TPlusX",
     defaultOutputMomentum: ["+x", "-y", "+y"],
     conditionalOutputs: [
@@ -133,7 +139,6 @@ export const BLOCK_TYPES: BlockBehavior[] = [
     ],
   },
   {
-    blockPath: "/sprites/isometric-cubes/TMinusX.png",
     blockName: "TMinusX",
     defaultOutputMomentum: ["-x", "-y", "+y"],
     conditionalOutputs: [
@@ -143,7 +148,6 @@ export const BLOCK_TYPES: BlockBehavior[] = [
     ],
   },
   {
-    blockPath: "/sprites/isometric-cubes/TPlusY.png",
     blockName: "TPlusY",
     defaultOutputMomentum: ["+y", "-x", "+x"],
     conditionalOutputs: [
@@ -153,7 +157,6 @@ export const BLOCK_TYPES: BlockBehavior[] = [
     ],
   },
   {
-    blockPath: "/sprites/isometric-cubes/TMinusY.png",
     blockName: "TMinusY",
     defaultOutputMomentum: ["-y", "-x", "+x"],
     conditionalOutputs: [
@@ -165,23 +168,49 @@ export const BLOCK_TYPES: BlockBehavior[] = [
 ];
 
 /**
- * Get block behavior by block name
+ * Registry of all block types and their behaviours, in palette order.
+ * Each block's sprite lives at public/sprites/isometric-cubes/<blockName>.png
+ */
+export const BLOCK_TYPES: BlockBehavior[] = BLOCK_DEFINITIONS.map(
+  (definition) => ({
+    ...definition,
+    label: definition.blockName.replace(/([A-Z])/g, " $1").trim(),
+    blockPath: assetPath(
+      `/sprites/isometric-cubes/${definition.blockName}.png`,
+    ),
+  }),
+);
+
+export const WALL_SPRITE_PATH = assetPath("/sprites/isometric-cubes/Walls.png");
+
+const BLOCKS_BY_NAME = new Map(
+  BLOCK_TYPES.map((block) => [block.blockName, block]),
+);
+
+/**
+ * Get block behaviour by block name
  */
 export function getBlockBehavior(blockName: string): BlockBehavior | undefined {
-  return BLOCK_TYPES.find((block) => block.blockName === blockName);
+  return BLOCKS_BY_NAME.get(blockName);
 }
 
+let blockCounter = 0;
+
 /**
- * Get block behavior by sprite path
+ * Create a new block of the given type
  */
-export function getBlockBehaviorByPath(
-  spritePath: string
-): BlockBehavior | undefined {
-  return BLOCK_TYPES.find((block) => block.blockPath === spritePath);
+export function createBlock(blockName: string, position: GridPosition): Block {
+  blockCounter += 1;
+  return {
+    id: `block-${blockCounter}`,
+    position,
+    blockName,
+    height: 0,
+  };
 }
 
 /**
- * Convert momentum direction to velocity vector
+ * Convert momentum direction to a one-cell grid step
  */
 export function momentumToVelocity(momentum: MomentumDirection): {
   x: number;
@@ -196,23 +225,7 @@ export function momentumToVelocity(momentum: MomentumDirection): {
       return { x: 0, y: 1 };
     case "-y":
       return { x: 0, y: -1 };
-    case "0":
-      return { x: 0, y: 0 };
     default:
       return { x: 0, y: 0 };
   }
-}
-
-/**
- * Convert velocity vector to momentum direction
- */
-export function velocityToMomentum(velocity: {
-  x: number;
-  y: number;
-}): MomentumDirection {
-  if (velocity.x > 0) return "+x";
-  if (velocity.x < 0) return "-x";
-  if (velocity.y > 0) return "+y";
-  if (velocity.y < 0) return "-y";
-  return "0";
 }

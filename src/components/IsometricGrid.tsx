@@ -1,390 +1,212 @@
 "use client";
 
-import React, { useRef, useCallback } from "react";
+import { type MouseEvent, useMemo } from "react";
+import type { BoardPointer, SelectionRect } from "@/hooks/useTrackEditor";
 import {
-  IsometricGridConfig,
+  type Block,
+  getBlockBehavior,
+  WALL_SPRITE_PATH,
+} from "@/lib/block-types";
+import {
+  depthZIndex,
+  GRID_MAX,
+  GRID_MIN,
+  type GridPosition,
+  gridToScreen,
+  type IsometricGridConfig,
   screenToGrid,
-  GridPosition,
 } from "@/lib/isometric";
+import type { MarbleState } from "@/lib/marble-state-machine";
 import { IsometricSprite } from "./IsometricSprite";
 import { Marble } from "./Marble";
-import { gridToScreenPosition } from "@/lib/marble-state-machine";
 
 interface IsometricGridProps {
   config: IsometricGridConfig;
   width: number;
   height: number;
-  sprites?: Array<{
-    position: GridPosition;
-    spritePath: string;
-    id: string;
-    hue?: number; // Individual hue for each sprite
-    height?: number; // Height of the block (number of wall layers below)
-  }>;
-  marbles?: Array<{
-    id: string;
-    gridPosition: GridPosition;
-    state: "rolling" | "falling" | "behind";
-    rotation: number;
-    behindCoordinates?: GridPosition;
-    momentum?: string;
-  }>;
-  previewSprite?: {
-    position: GridPosition;
-    spritePath: string;
-  };
-  previewMarble?: {
-    position: GridPosition;
-  };
+  blocks: Block[];
+  marbles: MarbleState[];
+  previewBlock?: { position: GridPosition; spritePath: string };
+  previewMarble?: GridPosition;
   isAutoMode?: boolean;
-  hueShift?: number; // Hue shift in degrees (0-360)
-  activeTool?: "place" | "move" | "select" | "marble" | "deepen"; // Add select to activeTool prop
-  selectedSpriteId?: string | null; // Add selectedSpriteId prop
-  isDragging?: boolean; // Add isDragging prop
-  onGridClick?: (gridPos: GridPosition) => void;
-  onGridHover?: (gridPos: GridPosition) => void;
-  onGridMouseDown?: (gridPos: GridPosition) => void;
-  onGridMouseUp?: () => void;
-  onGridMouseLeave?: () => void;
-  onSelectionChange?: (gridPos: GridPosition) => void; // For selection rectangle during drag
-  onScreenMouseDown?: (screenPos: {x: number, y: number}) => void; // For screen-space selection
-  onScreenMouseMove?: (screenPos: {x: number, y: number}) => void; // For screen-space selection
-  onSpriteClick?: (gridPos: GridPosition, spriteId: string) => void;
-  onSpriteMouseDown?: (gridPos: GridPosition, spriteId: string) => void;
-  onSpriteContextMenu?: (gridPos: GridPosition, spriteId: string) => void;
-  showGrid?: boolean;
-  className?: string;
-  // Selection rectangle props (using screen coordinates)
-  isSelecting?: boolean;
-  selectionStart?: {x: number, y: number} | null;
-  selectionEnd?: {x: number, y: number} | null;
-  selectedSprites?: string[];
+  /** Whether blocks respond to the pointer (move, select and deepen tools) */
+  blocksInteractive?: boolean;
+  selectedIds?: string[];
+  draggingIds?: string[];
+  selectionRect?: SelectionRect | null;
+  onPointerDown: (pointer: BoardPointer, button: number) => void;
+  onPointerMove: (pointer: BoardPointer) => void;
+  onPointerUp: (pointer: BoardPointer) => void;
+  onPointerLeave: () => void;
 }
 
 /**
- * Main isometric grid component that handles rendering and interactions
+ * The board: renders blocks, walls and marbles, and reports pointer events
+ * in grid and screen coordinates (relative to the board centre).
  */
-export const IsometricGrid: React.FC<IsometricGridProps> = ({
+export function IsometricGrid({
   config,
   width,
   height,
-  sprites = [],
-  marbles = [],
-  previewSprite,
+  blocks,
+  marbles,
+  previewBlock,
   previewMarble,
   isAutoMode = false,
-  hueShift = 0,
-  activeTool = "place",
-  selectedSpriteId = null,
-  isDragging = false,
-  onGridClick,
-  onGridHover,
-  onGridMouseDown,
-  onGridMouseUp,
-  onGridMouseLeave,
-  onSelectionChange,
-  onScreenMouseDown,
-  onScreenMouseMove,
-  onSpriteClick,
-  onSpriteMouseDown,
-  onSpriteContextMenu,
-  showGrid = true,
-  className = "",
-  isSelecting = false,
-  selectionStart,
-  selectionEnd,
-  selectedSprites = [],
-}) => {
-  const containerRef = useRef<HTMLDivElement>(null);
+  blocksInteractive = false,
+  selectedIds = [],
+  draggingIds = [],
+  selectionRect,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+  onPointerLeave,
+}: IsometricGridProps) {
+  const toPointer = (event: MouseEvent<HTMLDivElement>): BoardPointer => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const screen = {
+      x: event.clientX - rect.left - width / 2,
+      y: event.clientY - rect.top - height / 2,
+    };
+    const blockElement = (event.target as HTMLElement).closest<HTMLElement>(
+      "[data-block-id]",
+    );
+    return {
+      grid: screenToGrid(screen, config),
+      screen,
+      blockId: blockElement?.dataset.blockId ?? null,
+    };
+  };
 
-  const handleContainerMouseUp = useCallback(
-    (event: React.MouseEvent<HTMLDivElement>) => {
-      if (!containerRef.current) return;
-
-      // Call onGridMouseUp first
-      if (onGridMouseUp) {
-        onGridMouseUp();
-      }
-
-      // Then handle the click/placement
-      if (onGridClick) {
-        const rect = containerRef.current.getBoundingClientRect();
-        const screenPos = {
-          x: event.clientX - rect.left - width / 2,
-          y: event.clientY - rect.top - height / 2,
-        };
-
-        const gridPos = screenToGrid(screenPos, config);
-        onGridClick(gridPos);
-      }
-    },
-    [config, width, height, onGridClick, onGridMouseUp]
-  );
-
-  const handleContainerMouseMove = useCallback(
-    (event: React.MouseEvent<HTMLDivElement>) => {
-      if (!containerRef.current) return;
-
-      const rect = containerRef.current.getBoundingClientRect();
-      const screenPos = {
-        x: event.clientX - rect.left - width / 2,
-        y: event.clientY - rect.top - height / 2,
-      };
-
-      const gridPos = screenToGrid(screenPos, config);
-
-      if (onGridHover) {
-        onGridHover(gridPos);
-      }
-
-      if (onSelectionChange) {
-        onSelectionChange(gridPos);
-      }
-
-      if (onScreenMouseMove) {
-        onScreenMouseMove(screenPos);
-      }
-    },
-    [config, width, height, onGridHover, onSelectionChange, onScreenMouseMove]
-  );
-
-  const handleSpriteClick = useCallback(
-    (gridPos: GridPosition, spriteId: string) => {
-      if (onSpriteClick) {
-        onSpriteClick(gridPos, spriteId);
-      }
-    },
-    [onSpriteClick]
-  );
-
-  const handleSpriteMouseDown = useCallback(
-    (gridPos: GridPosition, spriteId: string) => {
-      if (onSpriteMouseDown) {
-        onSpriteMouseDown(gridPos, spriteId);
-      }
-    },
-    [onSpriteMouseDown]
-  );
-
-  const handleSpriteContextMenu = useCallback(
-    (gridPos: GridPosition, spriteId: string) => {
-      if (onSpriteContextMenu) {
-        onSpriteContextMenu(gridPos, spriteId);
-      }
-    },
-    [onSpriteContextMenu]
-  );
-
-  const handleContainerMouseDown = useCallback(
-    (event: React.MouseEvent<HTMLDivElement>) => {
-      if (!containerRef.current) return;
-
-      const rect = containerRef.current.getBoundingClientRect();
-      const screenPos = {
-        x: event.clientX - rect.left - width / 2,
-        y: event.clientY - rect.top - height / 2,
-      };
-
-      // Call screen coordinate handler if provided
-      if (onScreenMouseDown) {
-        onScreenMouseDown(screenPos);
-      }
-
-      // Call grid coordinate handler if provided
-      if (onGridMouseDown) {
-        const gridPos = screenToGrid(screenPos, config);
-        onGridMouseDown(gridPos);
-      }
-    },
-    [config, width, height, onGridMouseDown, onScreenMouseDown]
-  );
-
-  // Generate grid lines for visualization
-  const renderGridLines = () => {
-    if (!showGrid) return null;
-
-    const lines = [];
-    const gridRange = 10; // Show grid lines in a 10x10 area around center
-
-    for (let x = -gridRange; x <= gridRange; x++) {
-      for (let y = -gridRange; y <= gridRange; y++) {
-        const screenPos = {
-          x: (x - y) * config.gridCellWidth,
-          y: (x + y) * config.gridCellHeight,
-        };
-
-        lines.push(
+  const gridDots = useMemo(() => {
+    const dots = [];
+    for (let x = GRID_MIN; x <= GRID_MAX; x++) {
+      for (let y = GRID_MIN; y <= GRID_MAX; y++) {
+        const screenPos = gridToScreen({ x, y }, config);
+        dots.push(
           <div
-            key={`grid-${x}-${y}`}
+            key={`${x},${y}`}
             className="absolute w-1 h-1 bg-gray-300 opacity-30"
             style={{
-              left: `${screenPos.x + width / 2}px`,
-              top: `${screenPos.y + height / 2}px`,
-              zIndex: 1,
+              left: screenPos.x + width / 2,
+              top: screenPos.y + height / 2,
             }}
-          />
+          />,
         );
       }
     }
-
-    return lines;
-  };
-
-  // Render selection rectangle using screen coordinates
-  const renderSelectionRectangle = () => {
-    if (!isSelecting || !selectionStart || !selectionEnd) return null;
-
-    const minX = Math.min(selectionStart.x, selectionEnd.x);
-    const maxX = Math.max(selectionStart.x, selectionEnd.x);
-    const minY = Math.min(selectionStart.y, selectionEnd.y);
-    const maxY = Math.max(selectionStart.y, selectionEnd.y);
-
-    const rectWidth = maxX - minX;
-    const rectHeight = maxY - minY;
-
-    // Render a visual selection rectangle (no background, just border)
-    return (
-      <div
-        className="absolute border-2 border-blue-400 border-dashed pointer-events-none"
-        style={{
-          left: `${minX + width / 2}px`,
-          top: `${minY + height / 2}px`,
-          width: `${rectWidth}px`,
-          height: `${rectHeight}px`,
-          zIndex: 15,
-        }}
-      />
-    );
-  };
+    return dots;
+  }, [config, width, height]);
 
   return (
     <div
-      ref={containerRef}
-      className={`relative overflow-hidden ${className}`}
+      role="application"
+      aria-label="Marble run board"
+      className="relative overflow-hidden select-none bg-gray-800"
       style={{ width, height }}
-      onMouseMove={handleContainerMouseMove}
-      onMouseDown={handleContainerMouseDown}
-      onMouseUp={handleContainerMouseUp}
-      onMouseLeave={onGridMouseLeave}
+      onMouseDown={(event) => {
+        event.preventDefault(); // Don't start a text selection
+        onPointerDown(toPointer(event), event.button);
+      }}
+      onMouseMove={(event) => onPointerMove(toPointer(event))}
+      onMouseUp={(event) => onPointerUp(toPointer(event))}
+      onMouseLeave={onPointerLeave}
+      onContextMenu={(event) => event.preventDefault()}
     >
-      {/* Grid visualization */}
-      {renderGridLines()}
+      {gridDots}
 
-      {/* Selection rectangle */}
-      {renderSelectionRectangle()}
+      {selectionRect && (
+        <div
+          className="absolute border-2 border-blue-400 border-dashed pointer-events-none"
+          style={{
+            left:
+              Math.min(selectionRect.start.x, selectionRect.end.x) + width / 2,
+            top:
+              Math.min(selectionRect.start.y, selectionRect.end.y) + height / 2,
+            width: Math.abs(selectionRect.end.x - selectionRect.start.x),
+            height: Math.abs(selectionRect.end.y - selectionRect.start.y),
+            zIndex: 1500,
+          }}
+        />
+      )}
 
-      {/* Sprites container */}
+      {/* Everything is positioned relative to the board centre */}
       <div
         className="absolute pointer-events-none"
-        style={{
-          left: `${width / 2}px`,
-          top: `${height / 2}px`,
-          zIndex: 5,
-        }}
+        style={{ left: width / 2, top: height / 2 }}
       >
-        {/* Render all sprites and their walls */}
-        {sprites.flatMap((sprite) => {
-          const elements = [];
+        {blocks.flatMap((block) => {
+          const spritePath = getBlockBehavior(block.blockName)?.blockPath;
+          if (!spritePath) return [];
 
-          // Calculate the z-index for the main sprite (will be used for walls too)
-          const spriteZIndex = 100 + (sprite.position.x + sprite.position.y);
+          const blockZIndex = depthZIndex(block.position);
+          const isDragging = draggingIds.includes(block.id);
 
-          // First, render walls based on height (from bottom to top)
-          if (sprite.height && sprite.height > 0) {
-            for (let layer = sprite.height; layer >= 1; layer--) {
-              elements.push(
-                <IsometricSprite
-                  key={`${sprite.id}-wall-${layer}`}
-                  gridPosition={{
-                    x: sprite.position.x + layer,
-                    y: sprite.position.y + layer,
-                  }}
-                  spritePath="/sprites/isometric-cubes/Walls.png"
-                  config={config}
-                  hueShift={sprite.hue !== undefined ? sprite.hue : hueShift}
-                  zIndexOverride={spriteZIndex - layer} // Walls appear slightly behind the main sprite
-                />
-              );
-            }
-          }
+          // Walls stack straight down the screen below the block
+          const walls = Array.from({ length: block.height }, (_, index) => {
+            const layer = index + 1;
+            return (
+              <IsometricSprite
+                key={`${block.id}-wall-${layer}`}
+                gridPosition={{
+                  x: block.position.x + layer,
+                  y: block.position.y + layer,
+                }}
+                spritePath={WALL_SPRITE_PATH}
+                config={config}
+                hue={block.hue}
+                zIndex={blockZIndex - layer}
+                blockId={block.id}
+                interactive={blocksInteractive}
+              />
+            );
+          });
 
-          // Then render the main sprite on top
-          elements.push(
+          return [
+            ...walls,
             <IsometricSprite
-              key={sprite.id}
-              gridPosition={sprite.position}
-              spritePath={sprite.spritePath}
+              key={block.id}
+              gridPosition={block.position}
+              spritePath={spritePath}
               config={config}
-              hueShift={sprite.hue !== undefined ? sprite.hue : hueShift}
-              onClick={
-                activeTool === "move" ||
-                activeTool === "select" ||
-                activeTool === "deepen"
-                  ? (gridPos) => handleSpriteClick(gridPos, sprite.id)
-                  : undefined
-              }
-              onMouseDown={
-                activeTool === "move" || activeTool === "select"
-                  ? (gridPos) => handleSpriteMouseDown(gridPos, sprite.id)
-                  : undefined
-              }
-              onContextMenu={
-                activeTool === "deepen"
-                  ? (gridPos) => handleSpriteContextMenu(gridPos, sprite.id)
-                  : undefined
-              }
-              isDragging={isDragging && selectedSpriteId === sprite.id}
-              className={
-                activeTool === "move" ||
-                activeTool === "select" ||
-                activeTool === "deepen"
-                  ? `cursor-pointer hover:brightness-110 ${
-                      selectedSprites.includes(sprite.id)
-                        ? "ring-2 ring-blue-400 ring-offset-2"
-                        : ""
-                    }`
-                  : ""
-              }
-            />
-          );
-
-          return elements;
+              hue={block.hue}
+              blockId={block.id}
+              interactive={blocksInteractive}
+              isDragging={isDragging}
+              isSelected={selectedIds.includes(block.id)}
+            />,
+          ];
         })}
 
-        {/* Render marbles in the same container as sprites for proper z-index layering */}
         {marbles.map((marble) => (
           <Marble
             key={marble.id}
-            position={gridToScreenPosition(marble.gridPosition)}
-            rotation={marble.rotation}
+            position={gridToScreen(marble.gridPosition, config)}
             state={marble.state}
-            behindCoordinates={marble.behindCoordinates}
             momentum={marble.momentum}
+            behindCoordinates={marble.behindCoordinates}
+            warped={marble.warped}
             isAutoMode={isAutoMode}
           />
         ))}
 
-        {/* Preview sprite */}
-        {previewSprite && (
+        {previewBlock && (
           <IsometricSprite
-            gridPosition={previewSprite.position}
-            spritePath={previewSprite.spritePath}
+            gridPosition={previewBlock.position}
+            spritePath={previewBlock.spritePath}
             config={config}
-            hueShift={hueShift}
             className="opacity-50"
           />
         )}
 
-        {/* Preview marble */}
         {previewMarble && (
           <Marble
-            position={gridToScreenPosition(previewMarble.position)}
-            rotation={0}
-            state="falling"
+            position={gridToScreen(previewMarble, config)}
+            warped
             className="opacity-50"
           />
         )}
       </div>
     </div>
   );
-};
+}

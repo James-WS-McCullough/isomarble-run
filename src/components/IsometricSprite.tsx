@@ -1,99 +1,72 @@
-"use client";
-
-import React from "react";
 import {
-  GridPosition,
-  IsometricGridConfig,
+  depthZIndex,
+  type GridPosition,
   getSpritePlacement,
+  type IsometricGridConfig,
 } from "@/lib/isometric";
 
 interface IsometricSpriteProps {
   gridPosition: GridPosition;
   spritePath: string;
   config: IsometricGridConfig;
-  alt?: string;
+  /** Hue rotation in degrees (0-360) */
+  hue?: number;
+  /** Override the default depth-based draw order */
+  zIndex?: number;
+  /** Block this sprite belongs to, so the board can tell what was clicked */
+  blockId?: string;
+  /** Whether the sprite responds to the pointer */
+  interactive?: boolean;
+  isDragging?: boolean;
+  isSelected?: boolean;
   className?: string;
-  hueShift?: number; // Hue shift in degrees (0-360)
-  onClick?: (gridPos: GridPosition) => void;
-  onMouseDown?: (gridPos: GridPosition) => void;
-  onContextMenu?: (gridPos: GridPosition) => void; // Right-click handler
-  isDragging?: boolean; // New prop to indicate if this sprite is being dragged
-  zIndexOverride?: number; // Optional override for z-index calculation
 }
 
 /**
- * Component for rendering an isometric sprite at a specific grid position
+ * Renders a square sprite centred on an isometric grid cell
  */
-export const IsometricSprite: React.FC<IsometricSpriteProps> = ({
+export function IsometricSprite({
   gridPosition,
   spritePath,
   config,
-  alt = "Isometric sprite",
-  className = "",
-  hueShift = 0,
-  onClick,
-  onMouseDown,
-  onContextMenu,
+  hue,
+  zIndex,
+  blockId,
+  interactive = false,
   isDragging = false,
-  zIndexOverride,
-}) => {
+  isSelected = false,
+  className = "",
+}: IsometricSpriteProps) {
   const screenPos = getSpritePlacement(gridPosition, config);
-
-  const handleClick = () => {
-    if (onClick) {
-      onClick(gridPosition);
-    }
-  };
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault(); // Prevent text selection
-    if (onMouseDown) {
-      onMouseDown(gridPosition);
-    }
-  };
-
-  const handleContextMenu = (e: React.MouseEvent) => {
-    e.preventDefault(); // Prevent default context menu
-    if (onContextMenu) {
-      onContextMenu(gridPosition);
-    }
-  };
-
-  // Calculate z-index based on grid position
-  // Higher y values (further back) and higher x values should have higher z-index (render in front)
-  // This creates the proper isometric depth where "higher" objects appear in front
-  const zIndex =
-    zIndexOverride !== undefined
-      ? zIndexOverride
-      : 100 + (gridPosition.x + gridPosition.y);
+  const filter = [
+    hue ? `hue-rotate(${hue}deg)` : "",
+    isDragging ? "drop-shadow(0 0 8px rgba(59, 130, 246, 0.8))" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <img
       src={spritePath}
-      alt={alt}
-      className={`absolute pointer-events-auto block ${className} ${
-        isDragging ? "shadow-lg shadow-blue-500/50 brightness-110" : ""
-      }`}
+      alt=""
+      draggable={false}
+      data-block-id={blockId}
+      className={`absolute block ${interactive ? "cursor-pointer" : ""} ${
+        isSelected ? "ring-2 ring-blue-400 ring-offset-2" : ""
+      } ${className}`}
       style={{
-        left: `${screenPos.x}px`,
-        top: `${screenPos.y}px`,
-        width: `${config.spriteSize}px`,
-        height: `${config.spriteSize}px`,
-        minWidth: `${config.spriteSize}px`,
-        minHeight: `${config.spriteSize}px`,
+        left: screenPos.x,
+        top: screenPos.y,
+        width: config.spriteSize,
+        height: config.spriteSize,
+        maxWidth: "none", // The sprite layer has no width, so ignore Tailwind's max-width: 100%
         imageRendering: "pixelated",
-        zIndex: isDragging ? 1000 : zIndex, // Higher z-index when dragging
-        position: "absolute",
-        boxSizing: "border-box",
-        filter: `${hueShift !== 0 ? `hue-rotate(${hueShift}deg)` : ""} ${
-          isDragging ? "drop-shadow(0 0 8px rgba(59, 130, 246, 0.8))" : ""
-        }`.trim(),
-        transition: isDragging ? "none" : "filter 0.8s ease-in-out", // No transition when dragging
-        transform: isDragging ? "scale(1.1)" : "scale(1)", // Slightly larger when dragging
+        zIndex: isDragging ? 1000 : (zIndex ?? depthZIndex(gridPosition)),
+        filter: filter || undefined,
+        transition: isDragging ? "none" : "filter 0.8s ease-in-out",
+        transform: isDragging ? "scale(1.1)" : undefined,
+        pointerEvents: interactive ? "auto" : "none",
       }}
-      onClick={handleClick}
-      onMouseDown={handleMouseDown}
-      onContextMenu={handleContextMenu}
     />
   );
-};
+}

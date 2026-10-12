@@ -1,11 +1,15 @@
 /**
- * Isometric grid utilities for positioning and rendering sprites
+ * Isometric grid utilities for positioning and rendering sprites.
+ *
+ * Grid coordinates map to the screen as a diamond: +x goes down-right and
+ * +y goes down-left. Moving +1 in both x and y moves straight down the
+ * screen by one block height, which is how "falling" works.
  */
 
 export interface IsometricGridConfig {
   spriteSize: number; // The width/height of the square sprite
-  gridCellWidth: number; // 1/2 sprite height
-  gridCellHeight: number; // 1/4 sprite height
+  gridCellWidth: number; // 1/2 sprite size
+  gridCellHeight: number; // 1/4 sprite size
 }
 
 export interface GridPosition {
@@ -18,6 +22,10 @@ export interface ScreenPosition {
   y: number; // Screen Y coordinate
 }
 
+/** Playable grid runs from GRID_MIN to GRID_MAX on both axes */
+export const GRID_MIN = -10;
+export const GRID_MAX = 10;
+
 /**
  * Create an isometric grid configuration based on sprite size
  */
@@ -29,12 +37,15 @@ export function createIsometricGrid(spriteSize: number): IsometricGridConfig {
   };
 }
 
+/** The grid used by the app: 100px sprites on 50px × 25px cells */
+export const GRID_CONFIG = createIsometricGrid(100);
+
 /**
  * Convert grid coordinates to screen coordinates
  */
 export function gridToScreen(
   gridPos: GridPosition,
-  config: IsometricGridConfig
+  config: IsometricGridConfig,
 ): ScreenPosition {
   const { gridCellWidth, gridCellHeight } = config;
 
@@ -45,11 +56,11 @@ export function gridToScreen(
 }
 
 /**
- * Convert screen coordinates to grid coordinates
+ * Convert screen coordinates to the nearest grid cell
  */
 export function screenToGrid(
   screenPos: ScreenPosition,
-  config: IsometricGridConfig
+  config: IsometricGridConfig,
 ): GridPosition {
   const { gridCellWidth, gridCellHeight } = config;
 
@@ -63,27 +74,33 @@ export function screenToGrid(
 }
 
 /**
- * Get the sprite offset to center it on the grid cell
+ * Calculate the top-left screen position for a sprite centred on a grid cell
  */
-export function getSpriteOffset(config: IsometricGridConfig): ScreenPosition {
+export function getSpritePlacement(
+  gridPos: GridPosition,
+  config: IsometricGridConfig,
+): ScreenPosition {
+  const screenPos = gridToScreen(gridPos, config);
+
   return {
-    x: -config.spriteSize / 2,
-    y: -config.spriteSize / 2,
+    x: screenPos.x - config.spriteSize / 2,
+    y: screenPos.y - config.spriteSize / 2,
   };
 }
 
 /**
- * Calculate the complete screen position for a sprite including offset
+ * Draw order for something sitting in a grid cell: cells lower on the
+ * screen (higher x + y) are drawn in front.
  */
-export function getSpritePlacement(
-  gridPos: GridPosition,
-  config: IsometricGridConfig
-): ScreenPosition {
-  const screenPos = gridToScreen(gridPos, config);
-  const offset = getSpriteOffset(config);
+export function depthZIndex(gridPos: GridPosition): number {
+  return 100 + gridPos.x + gridPos.y;
+}
 
-  return {
-    x: screenPos.x + offset.x,
-    y: screenPos.y + offset.y,
-  };
+/** A string key for a grid position, handy for Maps and Sets */
+export function positionKey(pos: GridPosition): string {
+  return `${pos.x},${pos.y}`;
+}
+
+export function samePosition(a: GridPosition, b: GridPosition): boolean {
+  return a.x === b.x && a.y === b.y;
 }

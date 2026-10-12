@@ -5,9 +5,12 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "npx serve out",
     "lint": "biome check",
-    "format": "biome format --write"
+    "lint:fix": "biome check --write",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "check": "npm run lint && npm run typecheck && npm test"
   },
   "dependencies": {
     "framer-motion": "^12.23.12",
@@ -22,6 +25,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.7"
   }
 }

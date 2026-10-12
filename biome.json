@@ -17,7 +17,10 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true
+      "recommended": true,
+      "performance": {
+        "noImgElement": "off"
+      }
     },
     "domains": {
       "next": "recommended",
@@ -30,5 +33,17 @@
         "organizeImports": "on"
       }
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["**/*.css"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noUnknownAtRules": "off"
+          }
+        }
+      }
+    }
+  ]
 }

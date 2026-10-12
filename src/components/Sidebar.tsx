@@ -1,326 +1,213 @@
-"use client";
-
-import React from "react";
-import { BLOCK_TYPES } from "@/lib/block-types";
-
-// Tool types for the sidebar
-export type Tool = "place" | "move" | "select" | "marble" | "deepen";
-
-// Convert block types to sprite types for the UI
-const SPRITE_TYPES = BLOCK_TYPES.map((block, index) => ({
-  id: `block-${index}`,
-  name: block.blockName.replace(/([A-Z])/g, " $1").trim(), // Convert CamelCase to readable name
-  path: block.blockPath,
-  blockName: block.blockName,
-}));
+import type { Tool } from "@/hooks/useTrackEditor";
+import { BLOCK_TYPES, WALL_SPRITE_PATH } from "@/lib/block-types";
 
 interface SidebarProps {
   activeTool: Tool;
   onToolChange: (tool: Tool) => void;
-  selectedSpriteType: {
-    id: string;
-    name: string;
-    path: string;
-    blockName: string;
-  };
-  onSpriteTypeChange: (spriteType: {
-    id: string;
-    name: string;
-    path: string;
-    blockName: string;
-  }) => void;
-  isPlacingMarble: boolean;
-  onMarblePlacementToggle: () => void;
+  paletteBlock: string;
+  onPaletteBlockChange: (blockName: string) => void;
+  blockCount: number;
   marbleCount: number;
   onClearMarbles: () => void;
-  onResetColors: () => void;
-  spriteCount: number;
-  // New props for controls
+  onResetColours: () => void;
   autoMode: boolean;
   onAutoModeChange: (enabled: boolean) => void;
   soundEnabled: boolean;
   onSoundEnabledChange: (enabled: boolean) => void;
-  onStepMarbles: () => void;
+  onStep: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({
+const TOOLS: { id: Tool; name: string; icon: string; hint: string }[] = [
+  {
+    id: "place",
+    name: "Place",
+    icon: "🔨",
+    hint: "Click an empty cell to place the selected piece. Click a piece to remove it.",
+  },
+  {
+    id: "move",
+    name: "Move",
+    icon: "✋",
+    hint: "Drag a piece to move it.",
+  },
+  {
+    id: "select",
+    name: "Select",
+    icon: "⬚",
+    hint: "Drag a box to select pieces, then drag the selection to move them together.",
+  },
+  {
+    id: "marble",
+    name: "Marble",
+    icon: "⚪",
+    hint: "Click anywhere to drop a marble.",
+  },
+  {
+    id: "deepen",
+    name: "Deepen",
+    icon: "🕳️",
+    hint: "Left-click a piece to add a wall layer below it. Right-click to remove one.",
+  },
+];
+
+const buttonClass =
+  "px-2 py-1 text-white rounded text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
+
+export function Sidebar({
   activeTool,
   onToolChange,
-  selectedSpriteType,
-  onSpriteTypeChange,
-  isPlacingMarble,
-  onMarblePlacementToggle,
+  paletteBlock,
+  onPaletteBlockChange,
+  blockCount,
   marbleCount,
   onClearMarbles,
-  onResetColors,
-  spriteCount,
+  onResetColours,
   autoMode,
   onAutoModeChange,
   soundEnabled,
   onSoundEnabledChange,
-  onStepMarbles,
-}) => {
-  const tools = [
-    {
-      id: "place" as Tool,
-      name: "Place",
-      icon: "🔨",
-      description: "Place and remove track pieces",
-    },
-    {
-      id: "move" as Tool,
-      name: "Move",
-      icon: "✋",
-      description: "Drag individual track pieces",
-    },
-    {
-      id: "select" as Tool,
-      name: "Select",
-      icon: "⬚",
-      description: "Select and move multiple pieces",
-    },
-    {
-      id: "marble" as Tool,
-      name: "Marble",
-      icon: "⚪",
-      description: "Place marbles on the track",
-    },
-    {
-      id: "deepen" as Tool,
-      name: "Deepen",
-      icon: "🕳️",
-      description: "Add walls below track pieces",
-    },
-  ];
+  onStep,
+}: SidebarProps) {
+  const tool = TOOLS.find((t) => t.id === activeTool) ?? TOOLS[0];
 
   return (
-    <div className="w-64 bg-gray-800 border-r border-gray-700 flex flex-col h-screen">
-      {/* Header - Compact */}
+    <aside className="w-64 bg-gray-800 border-r border-gray-700 flex flex-col h-screen text-gray-200">
       <div className="p-3 border-b border-gray-700">
-        <h2 className="text-lg font-semibold text-gray-100">Marble Run</h2>
+        <h1 className="text-lg font-semibold text-gray-100">Isomarble Run</h1>
       </div>
 
-      {/* Controls - Compact */}
-      <div className="p-3 border-b border-gray-700">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-xs font-medium text-gray-300">Controls</span>
-          <span className="px-2 py-1 bg-blue-600 text-white rounded text-xs">
-            {activeTool.charAt(0).toUpperCase() + activeTool.slice(1)}
-          </span>
-        </div>
-        
+      <section className="p-3 border-b border-gray-700">
+        <h2 className="text-xs font-medium text-gray-300 mb-2">Simulation</h2>
         <div className="flex items-center gap-2">
           <button
-            onClick={onStepMarbles}
+            type="button"
+            onClick={onStep}
             disabled={marbleCount === 0}
-            className="px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className={`${buttonClass} bg-blue-600 hover:bg-blue-700`}
           >
             Step
           </button>
-
-          <label className="flex items-center gap-1 text-gray-200">
+          <label className="flex items-center gap-1 text-xs">
             <input
               type="checkbox"
               checked={autoMode}
               onChange={(e) => onAutoModeChange(e.target.checked)}
-              className="w-3 h-3 text-blue-600 bg-gray-600 border-gray-500 rounded focus:ring-blue-500"
+              className="w-3 h-3"
             />
-            <span className="text-xs">Auto</span>
+            Auto
           </label>
-
-          <label className="flex items-center gap-1 text-gray-200">
+          <label className="flex items-center gap-1 text-xs">
             <input
               type="checkbox"
               checked={soundEnabled}
               onChange={(e) => onSoundEnabledChange(e.target.checked)}
-              className="w-3 h-3 text-blue-600 bg-gray-600 border-gray-500 rounded focus:ring-blue-500"
+              className="w-3 h-3"
             />
-            <span className="text-xs">Sound</span>
+            Sound
           </label>
         </div>
-      </div>
+        <div className="grid grid-cols-2 gap-1 mt-2">
+          <button
+            type="button"
+            onClick={onClearMarbles}
+            disabled={marbleCount === 0}
+            className={`${buttonClass} bg-red-600 hover:bg-red-700`}
+          >
+            Clear marbles
+          </button>
+          <button
+            type="button"
+            onClick={onResetColours}
+            disabled={blockCount === 0}
+            className={`${buttonClass} bg-purple-600 hover:bg-purple-700`}
+          >
+            Reset colours
+          </button>
+        </div>
+      </section>
 
-      {/* Tool Selection - Compact Icons */}
-      <div className="p-3 border-b border-gray-700">
-        <span className="text-xs font-medium text-gray-300 block mb-2">Tools</span>
+      <section className="p-3 border-b border-gray-700">
+        <h2 className="text-xs font-medium text-gray-300 mb-2">Tools</h2>
         <div className="grid grid-cols-5 gap-1">
-          {tools.map((tool) => (
+          {TOOLS.map((t) => (
             <button
-              key={tool.id}
-              onClick={() => onToolChange(tool.id)}
+              type="button"
+              key={t.id}
+              onClick={() => onToolChange(t.id)}
+              aria-pressed={activeTool === t.id}
+              aria-label={t.name}
+              title={t.name}
               className={`p-2 rounded border transition-all ${
-                activeTool === tool.id
-                  ? "border-blue-500 bg-blue-900/30 text-blue-200"
-                  : "border-gray-600 bg-gray-700 hover:border-gray-500 hover:bg-gray-600 text-gray-200"
+                activeTool === t.id
+                  ? "border-blue-500 bg-blue-900/30"
+                  : "border-gray-600 bg-gray-700 hover:border-gray-500 hover:bg-gray-600"
               }`}
-              title={`${tool.name}: ${tool.description}`}
             >
-              <span className="text-lg">{tool.icon}</span>
+              <span className="text-lg">{t.icon}</span>
             </button>
           ))}
         </div>
-      </div>
+        <p className="mt-2 text-xs text-gray-400">
+          <span className="font-medium text-gray-200">{tool.name}:</span>{" "}
+          {tool.hint}
+        </p>
+        {activeTool !== "place" &&
+          activeTool !== "marble" &&
+          blockCount === 0 && (
+            <p className="mt-2 p-2 bg-amber-900/30 border border-amber-600 rounded text-xs text-amber-200">
+              No pieces yet. Use the Place tool first.
+            </p>
+          )}
+      </section>
 
-      {/* Tool-specific content */}
-      <div className="flex-1 overflow-y-auto">
-        {activeTool === "place" && (
-          <div className="p-3">
-            <span className="text-xs font-medium text-gray-300 block mb-2">
-              Track Pieces
-            </span>
-            <div className="grid grid-cols-3 gap-1">
-              {SPRITE_TYPES.map((spriteType) => (
-                <button
-                  key={spriteType.id}
-                  onClick={() => onSpriteTypeChange(spriteType)}
-                  className={`p-2 border rounded transition-all ${
-                    selectedSpriteType.id === spriteType.id
-                      ? "border-blue-500 bg-blue-900/30"
-                      : "border-gray-600 bg-gray-700 hover:border-gray-500 hover:bg-gray-600"
-                  }`}
-                  title={spriteType.name}
-                >
-                  <img
-                    src={spriteType.path}
-                    alt={spriteType.name}
-                    className="w-8 h-8 mx-auto"
-                    style={{ imageRendering: "pixelated" }}
-                  />
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {activeTool === "move" && (
-          <div className="p-3">
-            <span className="text-xs font-medium text-gray-300 block mb-2">
-              Move Individual
-            </span>
-            <div className="bg-gray-700 rounded p-2 mb-2">
-              <div className="text-xs text-gray-300">
-                Pieces: <span className="font-medium">{spriteCount}</span>
-              </div>
-            </div>
-            {spriteCount === 0 && (
-              <div className="p-2 bg-amber-900/30 border border-amber-600 rounded">
-                <div className="text-xs text-amber-200">
-                  No pieces to move. Use Place tool first.
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {activeTool === "select" && (
-          <div className="p-3">
-            <span className="text-xs font-medium text-gray-300 block mb-2">
-              Select Multiple
-            </span>
-            <div className="bg-gray-700 rounded p-2 mb-2">
-              <div className="text-xs text-gray-300">
-                Pieces: <span className="font-medium">{spriteCount}</span>
-              </div>
-            </div>
-            {spriteCount === 0 && (
-              <div className="p-2 bg-amber-900/30 border border-amber-600 rounded">
-                <div className="text-xs text-amber-200">
-                  No pieces to select. Use Place tool first.
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {activeTool === "marble" && (
-          <div className="p-3">
-            <span className="text-xs font-medium text-gray-300 block mb-2">
-              Marble Placement
-            </span>
-
-            <button
-              onClick={onMarblePlacementToggle}
-              className={`w-full p-2 border rounded transition-all mb-2 ${
-                isPlacingMarble
-                  ? "border-red-500 bg-red-900/30 text-red-200"
-                  : "border-gray-600 bg-gray-700 hover:border-gray-500 hover:bg-gray-600 text-gray-200"
-              }`}
-            >
-              <div className="flex items-center justify-center gap-2">
+      {activeTool === "place" && (
+        <section className="p-3 flex-1 overflow-y-auto">
+          <h2 className="text-xs font-medium text-gray-300 mb-2">
+            Track pieces
+          </h2>
+          <div className="grid grid-cols-3 gap-1">
+            {BLOCK_TYPES.map((block) => (
+              <button
+                type="button"
+                key={block.blockName}
+                onClick={() => onPaletteBlockChange(block.blockName)}
+                aria-pressed={paletteBlock === block.blockName}
+                title={block.label}
+                className={`p-2 border rounded transition-all ${
+                  paletteBlock === block.blockName
+                    ? "border-blue-500 bg-blue-900/30"
+                    : "border-gray-600 bg-gray-700 hover:border-gray-500 hover:bg-gray-600"
+                }`}
+              >
                 <img
-                  src="/sprites/marble/MarbleBase.png"
-                  alt="Marble"
-                  className="w-6 h-6"
+                  src={block.blockPath}
+                  alt={block.label}
+                  className="w-8 h-8 mx-auto"
                   style={{ imageRendering: "pixelated" }}
                 />
-                <span className="text-xs font-medium">
-                  {isPlacingMarble ? "Cancel" : "Place Marble"}
-                </span>
-              </div>
-            </button>
-
-            <div className="space-y-2">
-              <div className="bg-gray-700 rounded p-2">
-                <div className="text-xs text-gray-300">
-                  Marbles: <span className="font-medium">{marbleCount}</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-1">
-                <button
-                  onClick={onClearMarbles}
-                  disabled={marbleCount === 0}
-                  className="px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Clear
-                </button>
-
-                <button
-                  onClick={onResetColors}
-                  disabled={spriteCount === 0}
-                  className="px-2 py-1 bg-purple-600 text-white rounded hover:bg-purple-700 text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Reset
-                </button>
-              </div>
-            </div>
+              </button>
+            ))}
           </div>
-        )}
+        </section>
+      )}
 
-        {activeTool === "deepen" && (
-          <div className="p-3">
-            <span className="text-xs font-medium text-gray-300 block mb-2">
-              Adjust Height
-            </span>
-
-            <div className="mb-2 p-2 bg-gray-700 rounded">
-              <div className="flex items-center gap-2 mb-1">
-                <img
-                  src="/sprites/isometric-cubes/Walls.png"
-                  alt="Walls"
-                  className="w-6 h-6"
-                  style={{ imageRendering: "pixelated" }}
-                />
-                <span className="text-xs text-gray-300">Auto Walls</span>
-              </div>
-            </div>
-
-            <div className="bg-gray-700 rounded p-2">
-              <div className="text-xs text-gray-300">
-                Pieces: <span className="font-medium">{spriteCount}</span>
-              </div>
-            </div>
-
-            {spriteCount === 0 && (
-              <div className="mt-2 p-2 bg-amber-900/30 border border-amber-600 rounded">
-                <div className="text-xs text-amber-200">
-                  No pieces to modify. Use Place tool first.
-                </div>
-              </div>
-            )}
+      {activeTool === "deepen" && (
+        <section className="p-3">
+          <div className="flex items-center gap-2 p-2 bg-gray-700 rounded text-xs">
+            <img
+              src={WALL_SPRITE_PATH}
+              alt=""
+              className="w-6 h-6"
+              style={{ imageRendering: "pixelated" }}
+            />
+            Walls are added below the piece
           </div>
-        )}
-      </div>
-    </div>
+        </section>
+      )}
+
+      <footer className="mt-auto p-3 border-t border-gray-700 text-xs text-gray-400">
+        {blockCount} pieces · {marbleCount} marbles
+      </footer>
+    </aside>
   );
-};
+}

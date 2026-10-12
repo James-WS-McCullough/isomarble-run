@@ -1,66 +1,18 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: #111827;
+  color: #ededed;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
 
-/* Custom slider styles */
-.slider {
-  -webkit-appearance: none;
-  appearance: none;
-  background: linear-gradient(
-    to right,
-    hsl(0, 100%, 50%),
-    hsl(60, 100%, 50%),
-    hsl(120, 100%, 50%),
-    hsl(180, 100%, 50%),
-    hsl(240, 100%, 50%),
-    hsl(300, 100%, 50%),
-    hsl(360, 100%, 50%)
-  );
-  border-radius: 4px;
-  height: 8px;
-}
-
-.slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #ffffff;
-  border: 2px solid #374151;
-  cursor: pointer;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-}
-
-.slider::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #ffffff;
-  border: 2px solid #374151;
-  cursor: pointer;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+@keyframes marble-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
