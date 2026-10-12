@@ -145,6 +145,23 @@ describe("Simulation", () => {
     expect(floor.map((p) => p.id)).toContain(painted[1]);
   });
 
+  it("treats blocks as solid walls while falling", () => {
+    const start = createPiece("straight", 0, { x: 0, y: 0, z: 2 });
+    // A tall wall a little way past the end of the track...
+    const wall = [0, 1, 2, 3].map((z) =>
+      createPiece("block", 0, { x: 2, y: 0, z }),
+    );
+    // ...and a lower track in the gap below
+    const lower = createPiece("straight", 1, { x: 1, y: 0, z: 0 });
+    const sim = new Simulation(() => 0);
+    sim.setPieces([start, ...wall, lower]);
+    const marble = sim.addMarble(above(start.cell));
+
+    const painted = paintedIds(run(sim, 1.5));
+    expect(painted.slice(0, 2)).toEqual([start.id, lower.id]);
+    expect(marble.position.x).toBeLessThan(1.5);
+  });
+
   it("bounces back out of a catcher", () => {
     const straight = createPiece("straight", 0, { x: 1, y: 0, z: 0 });
     const catcher = createPiece("catcher", 0, { x: 0, y: 0, z: 0 });

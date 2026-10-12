@@ -10,6 +10,7 @@ import { hasGroove, pieceExits, piecePorts } from "./pieces";
 import {
   depthOf,
   fromScreen,
+  MARBLE_RADIUS,
   SQRT2,
   SQRT6,
   screenOf,
@@ -17,13 +18,7 @@ import {
   type Vec3,
   visiblePart,
 } from "./space";
-import {
-  frontmost,
-  type Piece,
-  REST_HEIGHTS,
-  restHeight,
-  TrackIndex,
-} from "./track";
+import { type Piece, REST_HEIGHTS, restHeight, TrackIndex } from "./track";
 
 /** Tuning for how marbles move. Distances are in grid cells. */
 export const PHYSICS = {
@@ -73,6 +68,11 @@ export interface Marble {
   visualOffset: Vec3;
   /** Horizontal distance travelled since the renderer last spun the marble */
   rolled: { x: number; y: number };
+  /**
+   * Whether the marble set off towards the camera. On the way down it can
+   * land on pieces that look below it, even ones really closer to the camera.
+   */
+  headingForward: boolean;
 }
 
 export type SimulationEvent =
@@ -82,6 +82,12 @@ export type SimulationEvent =
 
 /** How far from the middle of a face (0.5 is its corner) a marble can land */
 const LANDING_MARGIN = 0.4;
+/**
+ * How far a marble reaches down the screen past its contact point, in the
+ * face's own units. A face in front of the marble catches it this far before
+ * its back edge, so the face never hides part of the marble.
+ */
+const FRONT_REACH = 0.45;
 
 interface Bounds {
   bottom: number;
@@ -140,6 +146,7 @@ export class Simulation {
       speed: 0,
       visualOffset: { x: 0, y: 0, z: 0 },
       rolled: { x: 0, y: 0 },
+      headingForward: true,
     };
     this.marbles.push(marble);
     return marble;
@@ -231,9 +238,9 @@ export class Simulation {
     marble.rolled.y += after.y - before.y;
     marble.position = after;
 
-    this.bounceOffSides(marble, before);
+    this.bounceOffWalls(marble, before);
 
-    const landing = this.findLanding(before, marble.position);
+    const landing = this.findLanding(marble, before, marble.position);
     if (landing) {
       this.land(marble, landing, events);
       return true;
@@ -248,39 +255,87 @@ export class Simulation {
         this.bounds.top,
         this.bounds.frontDepth,
       );
+      marble.headingForward = true;
     }
     return true;
   }
 
-  /** Bounce a flying marble back if it moved into the side of a piece */
-  private bounceOffSides(marble: Marble, before: Vec3) {
-    const cell = roundCell(marble.position);
-    if (!this.track.isOccupied(cell)) return;
+  /**
+   * Pieces are solid: a flying marble that runs into the side of one bounces
+   * off it. Only the sides count; landing on top is handled separately.
+   */
+  private bounceOffWalls(marble: Marble, before: Vec3) {
+    const r = MARBLE_RADIUS;
+    const centre = roundCell(marble.position);
 
-    const previous = roundCell(before);
-    const v = marble.velocity;
-    if (cell.x !== previous.x) {
-      v.x = -v.x * PHYSICS.WALL_BOUNCE;
-      marble.position = { ...marble.position, x: before.x };
-    }
-    if (cell.y !== previous.y) {
-      v.y = -v.y * PHYSICS.WALL_BOUNCE;
-      marble.position = { ...marble.position, y: before.y };
+    for (let dz = -1; dz <= 1; dz++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const cell = { x: centre.x + dx, y: centre.y + dy, z: centre.z + dz };
+          if (!this.track.isOccupied(cell)) continue;
+
+          const p = marble.position;
+          // Only below the top of the block, and not under it
+          if (p.z >= cell.z + 0.5 || p.z < cell.z - 0.5 - r) continue;
+
+          const offX = p.x - clamp(p.x, cell.x - 0.5, cell.x + 0.5);
+          const offY = p.y - clamp(p.y, cell.y - 0.5, cell.y + 0.5);
+          const distance = Math.hypot(offX, offY);
+          if (distance >= r) continue;
+
+          const v = marble.velocity;
+          if (distance === 0) {
+            // Got inside the block: step back out and turn round
+            marble.position = { ...p, x: before.x, y: before.y };
+            v.x = -v.x * PHYSICS.WALL_BOUNCE;
+            v.y = -v.y * PHYSICS.WALL_BOUNCE;
+            continue;
+          }
+
+          // Push out of the wall and bounce off it
+          const nx = offX / distance;
+          const ny = offY / distance;
+          marble.position = {
+            ...p,
+            x: p.x + nx * (r - distance),
+            y: p.y + ny * (r - distance),
+          };
+          const into = v.x * nx + v.y * ny;
+          if (into < 0) {
+            v.x -= (1 + PHYSICS.WALL_BOUNCE) * into * nx;
+            v.y -= (1 + PHYSICS.WALL_BOUNCE) * into * ny;
+          }
+        }
+      }
     }
   }
 
   /**
    * Find the piece a flying marble lands on between two positions.
    *
-   * A marble lands when it falls past the middle of a top face *on screen*,
-   * as long as that face isn't in front of the marble (then the marble just
-   * drops behind it). It also lands on a top face it actually touches.
+   * - A marble lands on a top face it actually touches.
+   * - It also lands when it falls past the middle of a top face *on screen*,
+   *   as long as that face isn't in front of it.
+   * - A marble that set off towards the camera can also land on a face that
+   *   is in front of it. It lands as soon as it reaches the back edge of that
+   *   face on screen, before the face would hide any of it.
    */
   private findLanding(
+    marble: Marble,
     from: Vec3,
     to: Vec3,
   ): { piece: Piece; point: Vec3 } | null {
     let best: { piece: Piece; point: Vec3; progress: number } | null = null;
+    const consider = (piece: Piece, point: Vec3, progress: number) => {
+      if (
+        !best ||
+        progress < best.progress - 1e-9 ||
+        (Math.abs(progress - best.progress) <= 1e-9 &&
+          depthOf(piece.cell) > depthOf(best.piece.cell))
+      ) {
+        best = { piece, point, progress };
+      }
+    };
 
     for (const rest of REST_HEIGHTS) {
       // Touching a top face for real
@@ -302,37 +357,63 @@ export class Simulation {
         if (
           piece &&
           restHeight(piece.kind) === rest &&
-          !this.track.isCovered(piece) &&
-          (!best || f < best.progress)
+          !this.track.isCovered(piece)
         ) {
-          best = { piece, point, progress: f };
+          consider(piece, point, f);
         }
       }
 
-      // Passing the middle of a top face on screen. `a` and `b` say which
-      // on-screen column the marble is in; their sum grows as it falls.
-      const g0 = from.x + from.y - 2 * from.z + 2 * rest;
-      const g1 = to.x + to.y - 2 * to.z + 2 * rest;
-      for (let n = Math.floor(g0) + 1; n <= g1; n++) {
-        const f = (n - g0) / (g1 - g0);
-        if (best && f >= best.progress) break;
-        const point = lerp(from, to, f);
-        const across = point.x - point.z + rest;
-        const a = Math.round(across);
-        // Too close to the corner of a face to land on it
-        if (Math.abs(across - a) > LANDING_MARGIN) continue;
-        const candidates = this.track
-          .piecesInColumn({ a, b: n - a }, rest)
-          .filter((piece) => piece.cell.z + rest <= point.z + 0.05);
-        const piece = frontmost(candidates);
-        if (piece) {
-          const shifted = slideAlongView(point, piece.cell.z + rest - point.z);
-          best = { piece, point: shifted, progress: f };
+      // Top faces on screen. (a, b) is where the marble's contact point
+      // appears, in the grid coordinates of level 0: a face (A, B) covers
+      // a, b within 0.5 of A, B.
+      const a0 = from.x - from.z + rest;
+      const b0 = from.y - from.z + rest;
+      const a1 = to.x - to.z + rest;
+      const b1 = to.y - to.z + rest;
+      for (
+        let A = Math.floor(Math.min(a0, a1)) - 1;
+        A <= Math.ceil(Math.max(a0, a1)) + 1;
+        A++
+      ) {
+        for (
+          let B = Math.floor(Math.min(b0, b1)) - 1;
+          B <= Math.ceil(Math.max(b0, b1)) + 1;
+          B++
+        ) {
+          for (const piece of this.track.piecesInColumn({ a: A, b: B }, rest)) {
+            const inFront = piece.cell.z + rest > to.z + 0.05;
+            if (inFront && !marble.headingForward) continue;
+
+            // Down the screen (d) and across it (c), relative to the face
+            const d0 = a0 - A + (b0 - B);
+            const d1 = a1 - A + (b1 - B);
+            const c0 = a0 - A - (b0 - B);
+            const c1 = a1 - A - (b1 - B);
+            // Faces behind: land on passing the middle of the face.
+            // Faces in front: land on reaching their back edge.
+            const edge = (c: number) =>
+              inFront ? -1 + Math.abs(c) - FRONT_REACH : 0;
+            const g0 = d0 - edge(c0);
+            const g1 = d1 - edge(c1);
+            if (!(g0 < 0 && g1 >= 0)) continue;
+
+            const f = g0 / (g0 - g1);
+            const c = c0 + (c1 - c0) * f;
+            if (Math.abs(c) > (inFront ? 1 : 2 * LANDING_MARGIN)) continue;
+
+            const point = lerp(from, to, f);
+            consider(
+              piece,
+              slideAlongView(point, piece.cell.z + rest - point.z),
+              f,
+            );
+          }
         }
       }
     }
 
-    return best && { piece: best.piece, point: best.point };
+    const found = best as { piece: Piece; point: Vec3 } | null;
+    return found && { piece: found.piece, point: found.point };
   }
 
   private land(
@@ -417,17 +498,9 @@ export class Simulation {
     marble.velocity = { x: v.x * marble.speed, y: v.y * marble.speed, z: 0 };
     marble.rolling = null;
 
-    // Falling towards the camera, a marble can land on anything that looks
-    // like it is below it, even if it is really closer to the camera. Slide
-    // it (invisibly) to the front so nothing it falls past is in front of
-    // it. Falling away from the camera, it keeps its depth and can drop
-    // behind pieces in front of it.
-    if (direction === "+x" || direction === "+y") {
-      const forward = (this.bounds.frontDepth - depthOf(marble.position)) / 3;
-      if (forward > 0) {
-        marble.position = slideAlongView(marble.position, forward);
-      }
-    }
+    // Heading towards the camera, it can land on anything that looks below
+    // it. Heading away, it drops behind pieces that are in front of it.
+    marble.headingForward = direction === "+x" || direction === "+y";
 
     // Marbles change colour each time they set off on a new fall
     marble.hue = (marble.hue + 30 + Math.floor(this.random() * 111)) % 360;
