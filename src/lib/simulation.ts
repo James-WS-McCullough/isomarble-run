@@ -4,8 +4,9 @@ import {
   directionOfVelocity,
   oppositeDirection,
 } from "./directions";
-import { Path, routeBetween, routeFromLanding } from "./paths";
-import { pieceExits } from "./pieces";
+import { marbleHeightAt, nearestOnRoute, routeToExit } from "./grooves";
+import { Path, routeBetween } from "./paths";
+import { hasGroove, pieceExits, piecePorts } from "./pieces";
 import {
   depthOf,
   fromScreen,
@@ -345,11 +346,19 @@ export class Simulation {
     const arriving = directionOfVelocity(v.x, v.y, PHYSICS.DROP_SPEED);
     const exit = this.pick(pieceExits(piece.kind, piece.rotation, arriving));
 
+    // Settle from where it landed into the groove, then follow it out
     const local = {
       x: clamp(point.x - piece.cell.x, -0.5, 0.5),
       y: clamp(point.y - piece.cell.y, -0.5, 0.5),
     };
-    const path = pathOnPiece(piece, routeFromLanding(local, exit));
+    const route = routeToExit(piece.kind, piece.rotation, exit);
+    const { point: inGroove, next } = nearestOnRoute(route, local);
+    const path = pathOnPiece(
+      piece,
+      [local, inGroove, ...route.slice(next)],
+      false,
+      piece.cell.z + marbleHeightAt(piece.kind, piece.rotation, local),
+    );
 
     marble.speed = Math.min(
       PHYSICS.MAX_SPEED,
@@ -371,8 +380,26 @@ export class Simulation {
     arriving: Direction,
     events: SimulationEvent[],
   ) {
-    const exit = this.pick(pieceExits(piece.kind, piece.rotation, arriving));
     const entrySide = oppositeDirection(arriving);
+
+    // A grooved piece with no opening on this side is a solid wall
+    if (
+      hasGroove(piece.kind) &&
+      !piecePorts(piece.kind, piece.rotation).includes(entrySide)
+    ) {
+      const edge = pathOnPiece(
+        piece,
+        [DIRECTION_VECTORS[entrySide], DIRECTION_VECTORS[entrySide]].map(
+          (v) => ({ x: v.x / 2, y: v.y / 2 }),
+        ),
+      );
+      marble.speed *= PHYSICS.BOUNCE_KEEP;
+      this.snapTo(marble, edge.points[0]);
+      marble.rolling = { piece, path: edge, distance: 0, exit: entrySide };
+      return;
+    }
+
+    const exit = this.pick(pieceExits(piece.kind, piece.rotation, arriving));
     const route = routeBetween(entrySide, exit);
     const path = pathOnPiece(piece, route.points, route.turns);
 
@@ -414,15 +441,25 @@ export class Simulation {
   }
 }
 
+/**
+ * A path across a piece through points relative to its centre, at resting
+ * height. `startHeight` overrides the height of the first point, for a
+ * marble that landed off the groove and rolls down into it.
+ */
 function pathOnPiece(
   piece: Piece,
   points: { x: number; y: number }[],
   turns = false,
+  startHeight?: number,
 ): Path {
   const { x, y, z } = piece.cell;
   const height = z + restHeight(piece.kind);
   return new Path(
-    points.map((p) => ({ x: x + p.x, y: y + p.y, z: height })),
+    points.map((p, index) => ({
+      x: x + p.x,
+      y: y + p.y,
+      z: index === 0 && startHeight !== undefined ? startHeight : height,
+    })),
     turns,
   );
 }

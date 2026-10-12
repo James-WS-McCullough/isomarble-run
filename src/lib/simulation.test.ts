@@ -120,6 +120,41 @@ describe("Simulation", () => {
     expect(painted.slice(0, 3)).toEqual([straight.id, catcher.id, straight.id]);
   });
 
+  it("bounces off the side of a piece with no opening there", () => {
+    const start = createPiece("straight", 0, { x: 0, y: 0, z: 0 });
+    // Runs along y, so its -x side is a solid wall
+    const wall = createPiece("straight", 1, { x: 1, y: 0, z: 0 });
+    const sim = new Simulation(() => 0);
+    sim.setPieces([start, wall]);
+    const marble = sim.addMarble(above(start.cell));
+
+    let bouncedBack = false;
+    const painted: string[] = [];
+    for (let i = 0; i < 120; i++) {
+      painted.push(...paintedIds(sim.advance(1 / 60)));
+      if (marble.rolling?.piece === start && marble.rolling.exit === "-x") {
+        bouncedBack = true;
+      }
+    }
+    expect(bouncedBack).toBe(true);
+    expect(painted).not.toContain(wall.id);
+  });
+
+  it("turns down a splitter's curved branch", () => {
+    const feed = createPiece("straight", 0, { x: 1, y: 0, z: 0 });
+    const splitter = createPiece("tee", 0, { x: 0, y: 0, z: 0 });
+    const sim = new Simulation(() => 0.999);
+    sim.setPieces([feed, splitter]);
+    const marble = sim.addMarble(above(feed.cell));
+
+    let turned = false;
+    for (let i = 0; i < 120 && !turned; i++) {
+      sim.advance(1 / 60);
+      turned = marble.rolling?.piece === splitter && marble.rolling.path.turns;
+    }
+    expect(turned).toBe(true);
+  });
+
   it("caps the falling speed and wraps marbles back to the top", () => {
     const sim = new Simulation(() => 0);
     const marble = sim.addMarble({ x: 0, y: 0, z: 0 });

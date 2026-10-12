@@ -21,22 +21,16 @@ export function swirl(): THREE.Texture {
 
 export type PieceLook = "normal" | "highlight" | "ghost" | "blocked";
 
-export interface PieceMaterials {
-  /** Outside of the piece */
-  body: THREE.Material;
-  /** Darker wood at the bottom of the groove */
-  grooveFloor: THREE.Material;
-}
-
-const cache = new Map<string, PieceMaterials>();
+const cache = new Map<string, THREE.Material>();
 
 /** How strongly a painted colour stains the wood */
 const STAIN = 0.55;
 
-export function getPieceMaterials(
+/** Wood for a piece; vertex colours on the geometry darken the grooves */
+export function getPieceMaterial(
   hue: number | undefined,
   look: PieceLook,
-): PieceMaterials {
+): THREE.Material {
   const key = `${hue ?? "none"}-${look}`;
   const cached = cache.get(key);
   if (cached) return cached;
@@ -47,26 +41,27 @@ export function getPieceMaterials(
   }
   if (look === "blocked") tint.set("#ff6b6b");
 
-  const make = (shade: number) => {
-    const material = new THREE.MeshStandardMaterial({
-      map: wood(),
-      color: tint.clone().multiplyScalar(shade),
-      roughness: 0.8,
-      metalness: 0,
-    });
-    if (look === "ghost" || look === "blocked") {
-      material.transparent = true;
-      material.opacity = 0.55;
-      material.depthWrite = false;
-    }
-    if (look === "highlight") {
-      material.emissive = new THREE.Color("#ffd28a");
-      material.emissiveIntensity = 0.25;
-    }
-    return material;
-  };
+  const material = new THREE.MeshStandardMaterial({
+    map: wood(),
+    color: tint,
+    vertexColors: true,
+    roughness: 0.8,
+    metalness: 0,
+  });
+  if (look === "ghost" || look === "blocked") {
+    material.transparent = true;
+    material.opacity = 0.55;
+    material.depthWrite = false;
+  }
+  if (look === "highlight") {
+    material.emissive = new THREE.Color("#ffd28a");
+    material.emissiveIntensity = 0.25;
+  }
 
-  const materials = { body: make(1), grooveFloor: make(0.72) };
-  cache.set(key, materials);
-  return materials;
+  cache.set(key, material);
+  return material;
 }
+
+export const OUTLINE_MATERIAL = new THREE.LineBasicMaterial({
+  color: "#6b4423",
+});

@@ -56,6 +56,7 @@ The world is a real 3D grid (x and y across, z up), drawn with a true isometric 
 - **"If it looks connected, it is connected."** When a marble reaches the edge of a piece, it rolls onto any piece whose opening lines up on screen, at whatever depth it really is. The marble slides along your line of sight to get there, which is invisible from this camera.
 - **Falling uses real gravity.** Marbles leave the end of a track with their speed, fall in an arc, and land on the first top face they visibly drop onto. A face that is *in front* of the marble doesn't count: the marble drops behind it instead.
 - **Speed is real too, within limits.** Falls speed marbles up, friction slows them back down to a gentle cruising speed on the flat, curves scrub off a little speed, and catchers bounce marbles back. Falling speed is capped, so endless loops settle into a steady pace.
+- **Grooves are rounded channels.** The 3D models and the physics share one groove shape, so marbles sit snugly in the bottom of the groove, roll down into it if they land on the edge, and bounce off the side of a piece that has no opening.
 - Marbles that fall off the bottom of the board come back in at the top. Each marble stains the pieces it rolls over and changes colour every time it starts a new fall.
 
 Everything is drawn with [three.js](https://threejs.org) via [React Three Fiber](https://r3f.docs.pmnd.rs). The wood and marble textures are generated in code, so there are no image files to download.
@@ -75,6 +76,7 @@ src/
     simulation.ts         Marble physics, landing and the "looks connected" rule
     track.ts              Placed pieces and fast lookups by on-screen position
     pieces.ts             Piece types and where each sends a marble
+    grooves.ts            Groove shapes, shared by the 3D models and the physics
     paths.ts              Routes across the top of a piece
     space.ts              World coordinates and the isometric projection
     directions.ts         The four horizontal directions
@@ -85,7 +87,7 @@ src/
     CameraRig.tsx         Fixed isometric camera with zoom and pan
     PieceMesh.tsx         A wooden piece
     Marbles.tsx           Glass marbles that spin as they roll
-    pieceGeometry.ts      Piece shapes, with grooves carved into the top
+    pieceGeometry.ts      Piece models, with rounded grooves carved into the top
     materials.ts          Stained wood and marble materials
     textures.ts           Procedural wood grain and marble swirl
 public/audio/             Sound effects

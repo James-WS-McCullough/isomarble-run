@@ -1,9 +1,12 @@
 "use client";
 
-import { Edges } from "@react-three/drei";
 import type { PieceKind } from "@/lib/pieces";
 import { type Cell, toThree } from "@/lib/space";
-import { getPieceMaterials, type PieceLook } from "./materials";
+import {
+  getPieceMaterial,
+  OUTLINE_MATERIAL,
+  type PieceLook,
+} from "./materials";
 import { getPieceGeometry } from "./pieceGeometry";
 
 interface PieceMeshProps {
@@ -19,7 +22,6 @@ interface PieceMeshProps {
 }
 
 const ignoreRaycast = () => null;
-const EDGE_COLOUR = "#6b4423";
 
 export function PieceMesh({
   kind,
@@ -31,8 +33,7 @@ export function PieceMesh({
   pickable = true,
 }: PieceMeshProps) {
   const geometry = getPieceGeometry(kind);
-  const { body, grooveFloor } = getPieceMaterials(hue, look);
-  const raycast = pickable ? undefined : ignoreRaycast;
+  const material = getPieceMaterial(hue, look);
 
   return (
     <group
@@ -41,21 +42,15 @@ export function PieceMesh({
       userData={{ pieceId }}
     >
       <mesh
-        geometry={geometry.base}
-        // Box faces: +x, -x, top, bottom, +z, -z. With rails, the top of the
-        // base is the floor of the groove.
-        material={
-          geometry.rails ? [body, body, grooveFloor, body, body, body] : body
-        }
-        raycast={raycast}
-      >
-        <Edges threshold={20} color={EDGE_COLOUR} raycast={ignoreRaycast} />
-      </mesh>
-      {geometry.rails && (
-        <mesh geometry={geometry.rails} material={body} raycast={raycast}>
-          <Edges threshold={20} color={EDGE_COLOUR} raycast={ignoreRaycast} />
-        </mesh>
-      )}
+        geometry={geometry.solid}
+        material={material}
+        raycast={pickable ? undefined : ignoreRaycast}
+      />
+      <lineSegments
+        geometry={geometry.outline}
+        material={OUTLINE_MATERIAL}
+        raycast={ignoreRaycast}
+      />
     </group>
   );
 }

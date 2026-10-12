@@ -1,4 +1,5 @@
 import { DIRECTION_VECTORS, type Direction } from "./directions";
+import { quarterCircle } from "./grooves";
 import type { Vec3 } from "./space";
 
 /**
@@ -45,8 +46,6 @@ export class Path {
   }
 }
 
-const ARC_SEGMENTS = 8;
-
 function portPoint(side: Direction): { x: number; y: number } {
   const v = DIRECTION_VECTORS[side];
   return { x: v.x / 2, y: v.y / 2 };
@@ -70,39 +69,5 @@ export function routeBetween(
   if (start.x === -end.x && start.y === -end.y) {
     return { points: [start, end], turns: false };
   }
-
-  // Quarter circle around the corner the two openings share
-  const corner = { x: start.x + end.x, y: start.y + end.y };
-  const startAngle = Math.atan2(start.y - corner.y, start.x - corner.x);
-  let endAngle = Math.atan2(end.y - corner.y, end.x - corner.x);
-  if (endAngle - startAngle > Math.PI) endAngle -= 2 * Math.PI;
-  if (startAngle - endAngle > Math.PI) endAngle += 2 * Math.PI;
-
-  const points = [];
-  for (let i = 0; i <= ARC_SEGMENTS; i++) {
-    const angle = startAngle + ((endAngle - startAngle) * i) / ARC_SEGMENTS;
-    points.push({
-      x: corner.x + 0.5 * Math.cos(angle),
-      y: corner.y + 0.5 * Math.sin(angle),
-    });
-  }
-  return { points, turns: true };
-}
-
-/**
- * Route from wherever a marble landed on a piece to the opening on side
- * `to`. It settles into the groove first, passing through the centre if it
- * landed on the far side.
- */
-export function routeFromLanding(
-  landed: { x: number; y: number },
-  to: Direction,
-): { x: number; y: number }[] {
-  const v = DIRECTION_VECTORS[to];
-  const along = landed.x * v.x + landed.y * v.y;
-  if (along < 0) {
-    return [landed, { x: 0, y: 0 }, portPoint(to)];
-  }
-  const inGroove = { x: v.x * along, y: v.y * along };
-  return [landed, inGroove, portPoint(to)];
+  return { points: quarterCircle(from, to), turns: true };
 }

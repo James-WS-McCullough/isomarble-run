@@ -23,13 +23,16 @@ export interface Cell {
 
 export const MARBLE_RADIUS = 0.22;
 /** Half the width of the groove carved into a piece */
-export const GROOVE_HALF_WIDTH = 0.2;
-/** Depth of the groove, measured down from the top of the piece */
-export const GROOVE_DEPTH = 0.25;
+export const GROOVE_HALF_WIDTH = 0.24;
+/** Radius of the groove's rounded cross-section */
+export const GROOVE_PROFILE_RADIUS = 0.25;
+/** Depth of the groove at its centre, measured down from the top of the piece */
+export const GROOVE_DEPTH =
+  GROOVE_PROFILE_RADIUS -
+  Math.sqrt(GROOVE_PROFILE_RADIUS ** 2 - GROOVE_HALF_WIDTH ** 2);
 
 /** Height of a marble's centre above a grooved piece's centre */
-export const GROOVE_REST_HEIGHT =
-  0.5 + Math.sqrt(MARBLE_RADIUS ** 2 - GROOVE_HALF_WIDTH ** 2);
+export const GROOVE_REST_HEIGHT = 0.5 - GROOVE_DEPTH + MARBLE_RADIUS;
 /** Height of a marble's centre above a flat-topped block's centre */
 export const FLAT_REST_HEIGHT = 0.5 + MARBLE_RADIUS;
 
