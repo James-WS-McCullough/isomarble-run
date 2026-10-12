@@ -41,20 +41,40 @@ describe("pieceExits", () => {
 });
 
 describe("TrackIndex.findConnection", () => {
-  it("connects pieces that only line up on screen", () => {
-    const upper = createPiece("straight", 0, { x: 0, y: 0, z: 1 });
-    // One level down and one step back looks exactly like the next cell along
+  it("joins a piece that looks next door but is a level up and closer", () => {
+    const start = createPiece("straight", 0, { x: 0, y: 0, z: 0 });
+    // One step along the line of sight from the true neighbour (1, 0, 0)
+    const closer = createPiece("straight", 0, { x: 2, y: 1, z: 1 });
+    const track = new TrackIndex([start, closer]);
+    expect(track.findConnection(start, "+x")).toBe(closer);
+  });
+
+  it("won't join a piece whose join is hidden behind a wall", () => {
+    const start = createPiece("straight", 0, { x: 0, y: 0, z: 1 });
+    // Lower and further away: the front wall of `start` covers the join
     const lower = createPiece("straight", 0, { x: 0, y: -1, z: 0 });
-    const track = new TrackIndex([upper, lower]);
-    expect(track.findConnection(upper, "+x")).toBe(lower);
+    const track = new TrackIndex([start, lower]);
+    expect(track.findConnection(start, "+x")).toBeUndefined();
+  });
+
+  it("heading up the screen, joins a piece that is further away", () => {
+    const start = createPiece("straight", 0, { x: 0, y: 0, z: 1 });
+    const further = createPiece("straight", 0, { x: -2, y: -1, z: 0 });
+    const closer = createPiece("straight", 0, { x: 0, y: 1, z: 2 });
+    expect(new TrackIndex([start, further]).findConnection(start, "-x")).toBe(
+      further,
+    );
+    expect(
+      new TrackIndex([start, closer]).findConnection(start, "-x"),
+    ).toBeUndefined();
   });
 
   it("prefers the piece closest to the camera", () => {
-    const start = createPiece("straight", 0, { x: 0, y: 0, z: 1 });
-    const behind = createPiece("straight", 0, { x: 0, y: -1, z: 0 });
-    const neighbour = createPiece("straight", 0, { x: 1, y: 0, z: 1 });
-    const track = new TrackIndex([start, behind, neighbour]);
-    expect(track.findConnection(start, "+x")).toBe(neighbour);
+    const start = createPiece("straight", 0, { x: 0, y: 0, z: 0 });
+    const neighbour = createPiece("straight", 0, { x: 1, y: 0, z: 0 });
+    const closer = createPiece("straight", 0, { x: 2, y: 1, z: 1 });
+    const track = new TrackIndex([start, neighbour, closer]);
+    expect(track.findConnection(start, "+x")).toBe(closer);
   });
 
   it("ignores pieces with something stacked on top", () => {
@@ -81,14 +101,30 @@ describe("Simulation", () => {
   });
 
   it("rolls across pieces that only look connected", () => {
-    const upper = createPiece("straight", 0, { x: 0, y: 0, z: 1 });
-    const lower = createPiece("straight", 0, { x: 0, y: -1, z: 0 });
+    const lower = createPiece("straight", 0, { x: 0, y: 0, z: 0 });
+    const upper = createPiece("straight", 0, { x: 2, y: 1, z: 1 });
     const sim = new Simulation(() => 0);
-    sim.setPieces([upper, lower]);
-    sim.addMarble(above(upper.cell));
+    sim.setPieces([lower, upper]);
+    sim.addMarble(above(lower.cell));
 
     const painted = paintedIds(run(sim, 1.5));
-    expect(painted.slice(0, 2)).toEqual([upper.id, lower.id]);
+    expect(painted.slice(0, 2)).toEqual([lower.id, upper.id]);
+  });
+
+  it("falling towards the camera, lands on a piece that looks below it", () => {
+    const start = createPiece("straight", 0, { x: 0, y: 0, z: 2 });
+    // Looks two cells further along and lower, but is really closer to the
+    // camera than the falling marble
+    const front = [2, 3, 4].map((x) =>
+      createPiece("straight", 0, { x: x + 2, y: 2, z: 2 }),
+    );
+    const sim = new Simulation(() => 0);
+    sim.setPieces([start, ...front]);
+    sim.addMarble(above(start.cell));
+
+    const painted = paintedIds(run(sim, 1.5));
+    expect(painted[0]).toBe(start.id);
+    expect(front.map((p) => p.id)).toContain(painted[1]);
   });
 
   it("drops behind a piece that is in front of it instead of landing on it", () => {

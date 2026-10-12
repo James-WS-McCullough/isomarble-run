@@ -416,6 +416,19 @@ export class Simulation {
     const v = DIRECTION_VECTORS[direction];
     marble.velocity = { x: v.x * marble.speed, y: v.y * marble.speed, z: 0 };
     marble.rolling = null;
+
+    // Falling towards the camera, a marble can land on anything that looks
+    // like it is below it, even if it is really closer to the camera. Slide
+    // it (invisibly) to the front so nothing it falls past is in front of
+    // it. Falling away from the camera, it keeps its depth and can drop
+    // behind pieces in front of it.
+    if (direction === "+x" || direction === "+y") {
+      const forward = (this.bounds.frontDepth - depthOf(marble.position)) / 3;
+      if (forward > 0) {
+        marble.position = slideAlongView(marble.position, forward);
+      }
+    }
+
     // Marbles change colour each time they set off on a new fall
     marble.hue = (marble.hue + 30 + Math.floor(this.random() * 111)) % 360;
   }

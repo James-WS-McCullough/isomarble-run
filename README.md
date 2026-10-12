@@ -4,7 +4,7 @@ An isometric wooden marble run where impossible tracks work. Build a run out of 
 
 **Play it:** https://james-ws-mccullough.github.io/isomarble-run/
 
-![Glass marbles rolling round an endless Penrose staircase made of wooden track pieces](docs/screenshot.png)
+![Glass marbles rolling round an impossible wooden marble run inspired by Escher's Waterfall](docs/screenshot.png)
 
 ## How to play
 
@@ -25,7 +25,7 @@ Pieces: **1** Straight, **2** Curve, **3** Splitter, **4** Crossing, **5** Catch
 | Space | Play / pause |
 | Ctrl+Z / Ctrl+Y | Undo / redo |
 
-Press **Load example** to get the Penrose staircase back.
+Press **Load example** to get the starter track back: Escher's Waterfall, where marbles fall off a tower and roll along a "flat" track back to the top.
 
 ## Running locally
 
@@ -53,8 +53,8 @@ Then open http://localhost:3000.
 
 The world is a real 3D grid (x and y across, z up), drawn with a true isometric camera that looks along the diagonal (−1, −1, −1). From that angle, a point and the point one step along *every* axis, p + (1, 1, 1), land on exactly the same spot on screen. A piece one level down and one step forward looks identical to a piece right next door, and the simulation uses that:
 
-- **"If it looks connected, it is connected."** When a marble reaches the edge of a piece, it rolls onto any piece whose opening lines up on screen, at whatever depth it really is. The marble slides along your line of sight to get there, which is invisible from this camera.
-- **Falling uses real gravity.** Marbles leave the end of a track with their speed, fall in an arc, and land on the first top face they visibly drop onto. A face that is *in front* of the marble doesn't count: the marble drops behind it instead.
+- **"If it looks connected, it is connected."** When a marble reaches the edge of a piece, it rolls onto any piece whose groove visibly carries on from this one, at whatever depth it really is. The marble slides along your line of sight to get there, which is invisible from this camera. A join only counts if no wood covers it: heading down the screen (+x or +y) the next piece must be at the same depth or closer to you; heading up the screen it must be the same depth or further away. Otherwise the front wall of one piece would hang over the join and it would look like a step.
+- **Falling uses real gravity.** Marbles leave the end of a track with their speed and fall in an arc. A marble falling towards the camera lands on whatever it visibly drops onto. A marble falling off the back of a track keeps its real depth, so it drops *behind* pieces that are in front of it.
 - **Speed is real too, within limits.** Falls speed marbles up, friction slows them back down to a gentle cruising speed on the flat, curves scrub off a little speed, and catchers bounce marbles back. Falling speed is capped, so endless loops settle into a steady pace.
 - **Grooves are rounded channels.** The 3D models and the physics share one groove shape, so marbles sit snugly in the bottom of the groove, roll down into it if they land on the edge, and bounce off the side of a piece that has no opening.
 - Marbles that fall off the bottom of the board come back in at the top. Each marble stains the pieces it rolls over and changes colour every time it starts a new fall.
@@ -81,7 +81,7 @@ src/
     space.ts              World coordinates and the isometric projection
     directions.ts         The four horizontal directions
     sound.ts              Web Audio landing taps and speed-matched rolling
-    example.ts            The Penrose staircase starter track
+    example.ts            The starter track, Escher's Waterfall
   three/
     Board.tsx             The 3D scene, pointer handling and build preview
     CameraRig.tsx         Fixed isometric camera with zoom and pan

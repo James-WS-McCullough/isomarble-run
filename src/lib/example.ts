@@ -1,58 +1,63 @@
 import type { PieceKind } from "./pieces";
 import { createPiece, type Piece } from "./track";
 
-interface Placement {
-  kind: PieceKind;
-  rotation: number;
-  /** Position on screen, as the cell this piece would be in at level 0 */
-  u: number;
-  v: number;
-  level: number;
-}
+type Placement = [
+  kind: PieceKind,
+  rotation: number,
+  /** Where the piece appears on screen, as the cell it would fill at level 0 */
+  u: number,
+  v: number,
+  level: number,
+];
 
 /**
- * A Penrose staircase: a square loop of track where every piece is one step
- * lower than the one before it, yet the last piece still joins up with the
- * first. A piece at (u + level, v + level, level) looks exactly like it is
- * at (u, v, 0) from the isometric camera, so the loop looks closed.
+ * Escher's Waterfall as a marble run. Marbles roll off the top of a tower
+ * and fall four levels into a catcher, then roll along track that looks
+ * perfectly flat all the way back to the top.
+ *
+ * The climb is hidden in the joins: heading down the screen (+x or +y),
+ * the next piece can be higher and closer to the camera and the join still
+ * looks seamless. A piece at (u + level, v + level, level) looks exactly
+ * like it is at (u, v, 0) from the isometric camera.
  */
-function penroseLoop(size: number): Piece[] {
-  const low = -Math.floor(size / 2);
-  const high = low + size - 1;
+const WATERFALL: Placement[] = [
+  // The top of the tower: marbles leave its +x end and fall
+  ["straight", 0, -2, -3, 4],
+  // The catcher at the bottom sends marbles off along +y
+  ["catcher", 1, 4, 1, 0],
+  // Heading +y (down the screen), climbing a level with each piece
+  ["straight", 1, 4, 2, 1],
+  ["curve", 2, 4, 3, 2],
+  // Back along -x and -y (up the screen), staying level
+  ["straight", 0, 3, 3, 2],
+  ["straight", 0, 2, 3, 2],
+  ["straight", 0, 1, 3, 2],
+  ["straight", 0, 0, 3, 2],
+  ["straight", 0, -1, 3, 2],
+  ["straight", 0, -2, 3, 2],
+  ["straight", 0, -3, 3, 2],
+  ["curve", 3, -4, 3, 2],
+  ["straight", 1, -4, 2, 2],
+  ["straight", 1, -4, 1, 2],
+  ["straight", 1, -4, 0, 2],
+  ["straight", 1, -4, -1, 2],
+  ["straight", 1, -4, -2, 2],
+  ["curve", 0, -4, -3, 2],
+  // And +x into the tower top, climbing the last two levels
+  ["straight", 0, -3, -3, 3],
+];
 
-  // Walk the ring clockwise on screen: corners are curves, sides straights
-  const ring: Placement[] = [];
-  const sides = [
-    { corner: [low, low], curve: 0, step: [1, 0], straight: 0 },
-    { corner: [high, low], curve: 1, step: [0, 1], straight: 1 },
-    { corner: [high, high], curve: 2, step: [-1, 0], straight: 0 },
-    { corner: [low, high], curve: 3, step: [0, -1], straight: 1 },
-  ];
-  for (const side of sides) {
-    const [cu, cv] = side.corner;
-    ring.push({ kind: "curve", rotation: side.curve, u: cu, v: cv, level: 0 });
-    for (let i = 1; i < size - 1; i++) {
-      ring.push({
-        kind: "straight",
-        rotation: side.straight,
-        u: cu + side.step[0] * i,
-        v: cv + side.step[1] * i,
-        level: 0,
-      });
+/** The starter track */
+export function exampleTrack(): Piece[] {
+  const pieces: Piece[] = [];
+  for (const [kind, rotation, u, v, level] of WATERFALL) {
+    const x = u + level;
+    const y = v + level;
+    pieces.push(createPiece(kind, rotation, { x, y, z: level }));
+    // A wooden pillar down to the floor
+    for (let z = 0; z < level; z++) {
+      pieces.push(createPiece("block", 0, { x, y, z }));
     }
   }
-
-  return ring.map(({ kind, rotation, u, v }, index) => {
-    const level = ring.length - 1 - index;
-    return createPiece(kind, rotation, {
-      x: u + level,
-      y: v + level,
-      z: level,
-    });
-  });
-}
-
-/** The starter track: an endless Penrose staircase */
-export function exampleTrack(): Piece[] {
-  return penroseLoop(5);
+  return pieces;
 }

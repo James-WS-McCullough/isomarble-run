@@ -99,8 +99,9 @@ export class TrackIndex {
 
   /**
    * The piece a marble rolls onto when it leaves `piece` heading in
-   * `direction`: any piece whose opening lines up on screen with this
-   * exit. If several line up, the one closest to the camera wins.
+   * `direction`: a piece whose opening lines up on screen with this exit,
+   * at a depth where the join really looks seamless. If several qualify,
+   * the one closest to the camera (the one you can see) wins.
    */
   findConnection(piece: Piece, direction: Direction): Piece | undefined {
     const { x, y, z } = piece.cell;
@@ -111,7 +112,9 @@ export class TrackIndex {
       oppositeDirection(direction),
     );
     return frontmost(
-      (this.ports.get(key) ?? []).filter((other) => other !== piece),
+      (this.ports.get(key) ?? []).filter(
+        (other) => other !== piece && looksJoined(piece, other, direction),
+      ),
     );
   }
 
@@ -122,6 +125,24 @@ export class TrackIndex {
   piecesInColumn(column: { a: number; b: number }, rest: number): Piece[] {
     return this.columns.get(columnKey(column.a, column.b, rest)) ?? [];
   }
+}
+
+/**
+ * Whether two pieces whose openings line up on screen really look joined.
+ *
+ * `next` sits k steps along the line of sight from the true neighbouring
+ * cell (k > 0 is closer to the camera). Where the pieces meet, the one
+ * further down the screen must not be further away: otherwise the front
+ * wall of the upper piece hangs down over the join and it looks like a step.
+ * Heading down the screen (+x, +y) that means k >= 0; heading up it, k <= 0.
+ */
+export function looksJoined(
+  from: Piece,
+  next: Piece,
+  direction: Direction,
+): boolean {
+  const k = next.cell.z - from.cell.z;
+  return direction === "+x" || direction === "+y" ? k >= 0 : k <= 0;
 }
 
 function portKey(a: number, b: number, side: Direction): string {
