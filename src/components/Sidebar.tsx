@@ -36,7 +36,7 @@ const TOOLS: { id: Tool; name: string; icon: string; key: string }[] = [
 
 const TOOL_HINTS: Record<Tool, string> = {
   build:
-    "Click to place a piece on the grid or on the side of another piece. R rotates it.",
+    "Click to place a piece on the grid or on the side of another piece. R rotates it. Pieces snap to the depth where they join up with the track; [ and ] slide them further away or closer.",
   move: "Drag a piece to move it. R rotates the piece under the pointer.",
   marble: "Click anywhere to drop a marble.",
   erase: "Click a piece to remove it.",
@@ -46,6 +46,7 @@ const SHORTCUTS: [string, string][] = [
   ["Right-click", "Remove a piece"],
   ["Scroll", "Zoom"],
   ["Shift-drag / arrows", "Pan"],
+  ["[ / ]", "Slide piece further / closer"],
   ["Space", "Play / pause"],
   ["Ctrl+Z / Ctrl+Y", "Undo / redo"],
 ];

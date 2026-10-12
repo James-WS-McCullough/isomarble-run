@@ -158,12 +158,17 @@ function GhostPiece({ ghost }: { ghost: Ghost }) {
           depthWrite={false}
         />
       </mesh>
-      {cell.z > 0 && (
+      {cell.z !== 0 && (
+        // A line from the piece to the floor (up to it, if it's below)
         <mesh
-          position={[cell.x, (cell.z - 1) / 2, cell.y]}
+          position={[
+            cell.x,
+            cell.z > 0 ? (cell.z - 1) / 2 : cell.z / 2,
+            cell.y,
+          ]}
           raycast={() => null}
         >
-          <boxGeometry args={[0.04, cell.z, 0.04]} />
+          <boxGeometry args={[0.04, Math.abs(cell.z), 0.04]} />
           <meshBasicMaterial color={colour} transparent opacity={0.6} />
         </mesh>
       )}
@@ -227,8 +232,13 @@ function targetFromEvent(
   event: ThreeEvent<PointerEvent | MouseEvent>,
   pieces: Piece[],
 ): BoardTarget {
-  const point = { x: event.point.x, y: event.point.z, z: event.point.y };
-  const pieceId = findPieceId(event.object);
+  // The floor is invisible to pieces: a piece below it can still be hit
+  const hit =
+    event.intersections.find((intersection) =>
+      findPieceId(intersection.object),
+    ) ?? event;
+  const point = { x: hit.point.x, y: hit.point.z, z: hit.point.y };
+  const pieceId = findPieceId(hit.object);
   const piece = pieceId ? pieces.find((p) => p.id === pieceId) : undefined;
 
   if (piece) {

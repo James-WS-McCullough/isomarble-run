@@ -104,7 +104,16 @@ export class TrackIndex {
    * the one closest to the camera (the one you can see) wins.
    */
   findConnection(piece: Piece, direction: Direction): Piece | undefined {
-    const { x, y, z } = piece.cell;
+    return this.findConnectionFrom(piece.cell, direction, piece);
+  }
+
+  /** As findConnection, for a piece that would sit at `cell` */
+  findConnectionFrom(
+    cell: Cell,
+    direction: Direction,
+    exclude?: Piece,
+  ): Piece | undefined {
+    const { x, y, z } = cell;
     const v = DIRECTION_VECTORS[direction];
     const key = portKey(
       x + v.x / 2 - z,
@@ -113,7 +122,8 @@ export class TrackIndex {
     );
     return frontmost(
       (this.ports.get(key) ?? []).filter(
-        (other) => other !== piece && looksJoined(piece, other, direction),
+        (other) =>
+          other !== exclude && looksJoined(cell, other.cell, direction),
       ),
     );
   }
@@ -137,11 +147,11 @@ export class TrackIndex {
  * Heading down the screen (+x, +y) that means k >= 0; heading up it, k <= 0.
  */
 export function looksJoined(
-  from: Piece,
-  next: Piece,
+  from: Cell,
+  next: Cell,
   direction: Direction,
 ): boolean {
-  const k = next.cell.z - from.cell.z;
+  const k = next.z - from.z;
   return direction === "+x" || direction === "+y" ? k >= 0 : k <= 0;
 }
 

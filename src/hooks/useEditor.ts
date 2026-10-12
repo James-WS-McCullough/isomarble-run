@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PIECES, type PieceKind } from "@/lib/pieces";
-import type { Cell, Vec3 } from "@/lib/space";
+import { LOWEST_LEVEL, slideCell, snapToJoins } from "@/lib/placement";
+import { type Cell, cellKey, type Vec3 } from "@/lib/space";
 import { createPiece, type Piece } from "@/lib/track";
 import type { BoardTarget, Ghost } from "@/three/Board";
 import { useHistory } from "./useHistory";
@@ -26,7 +27,9 @@ function sameCell(a: Cell, b: Cell): boolean {
 
 /**
  * Building tools:
- * - build: click to place the selected piece, R to rotate it
+ * - build: click to place the selected piece, R to rotate it. Pieces snap
+ *   to the depth along the line of sight where they join up with the track;
+ *   [ and ] slide them further away or closer.
  * - move: drag a piece somewhere else, R to rotate the piece under the pointer
  * - marble: click to drop a marble
  * - erase: click a piece to remove it
@@ -42,9 +45,11 @@ export function useEditor({ initialPieces, onDropMarble }: EditorOptions) {
   const [rotation, setRotation] = useState(0);
   const [target, setTarget] = useState<BoardTarget | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
+  /** Extra steps along the line of sight, chosen with [ and ] */
+  const [depthNudge, setDepthNudge] = useState(0);
 
   const canPlace = (cell: Cell, ignoreId?: string) =>
-    cell.z >= 0 &&
+    cell.z >= LOWEST_LEVEL &&
     !pieces.some(
       (piece) => piece.id !== ignoreId && sameCell(piece.cell, cell),
     );
@@ -61,23 +66,63 @@ export function useEditor({ initialPieces, onDropMarble }: EditorOptions) {
       ),
     );
 
+  const draggedPiece = drag
+    ? pieces.find((piece) => piece.id === drag.pieceId)
+    : undefined;
+  const placing =
+    draggedPiece ?? (tool === "build" ? { kind, rotation } : null);
+
+  // Where the piece being placed (or dragged) would go: the depth where it
+  // joins up best, nudged by [ and ]. Only recomputed when what's being
+  // placed, or where, changes.
+  const placingKind = placing?.kind;
+  const placingRotation = placing?.rotation ?? 0;
+  const ignoreId = draggedPiece?.id;
+  const baseKey = target ? cellKey(target.placeCell) : null;
+  const snapped = useMemo(() => {
+    if (!baseKey || !placingKind) return null;
+    const [x, y, z] = baseKey.split(",").map(Number);
+    return snapToJoins(
+      pieces,
+      placingKind,
+      placingRotation,
+      { x, y, z },
+      ignoreId,
+    );
+  }, [pieces, placingKind, placingRotation, baseKey, ignoreId]);
+  const placeCell = snapped ? slideCell(snapped, depthNudge) : null;
+
   const onTargetChange = (next: BoardTarget | null) => {
+    if (
+      !next ||
+      !target ||
+      cellKey(next.placeCell) !== cellKey(target.placeCell)
+    ) {
+      setDepthNudge(0);
+    }
     setTarget(next);
-    if (drag && next) {
-      setDrag({
-        ...drag,
-        cell: next.placeCell,
-        valid: canPlace(next.placeCell, drag.pieceId),
-      });
+  };
+
+  // Keep the dragged piece's destination up to date
+  useEffect(() => {
+    if (!drag || !placeCell) return;
+    if (cellKey(placeCell) === cellKey(drag.cell)) return;
+    setDrag({
+      ...drag,
+      cell: placeCell,
+      valid: canPlace(placeCell, drag.pieceId),
+    });
+  });
+
+  const onClick = () => {
+    if (tool === "build" && placeCell && canPlace(placeCell)) {
+      history.commit([...pieces, createPiece(kind, rotation, placeCell)]);
     }
   };
 
-  const onClick = (clicked: BoardTarget) => {
-    if (tool === "build" && canPlace(clicked.placeCell)) {
-      history.commit([
-        ...pieces,
-        createPiece(kind, rotation, clicked.placeCell),
-      ]);
+  const onBoardClick = (clicked: BoardTarget) => {
+    if (tool === "build") {
+      onClick();
     } else if (tool === "marble") {
       onDropMarble(clicked.point);
     } else if (tool === "erase" && clicked.pieceId) {
@@ -157,6 +202,10 @@ export function useEditor({ initialPieces, onDropMarble }: EditorOptions) {
         removePiece(target.pieceId);
       } else if (key === "escape") {
         setDrag(null);
+      } else if (key === "[") {
+        setDepthNudge((n) => n - 1);
+      } else if (key === "]") {
+        setDepthNudge((n) => n + 1);
       } else {
         const piece = PIECES.find((p) => p.hotkey === key);
         if (piece) choosePiece(piece.kind);
@@ -174,13 +223,8 @@ export function useEditor({ initialPieces, onDropMarble }: EditorOptions) {
   });
 
   const ghost: Ghost | null =
-    tool === "build" && target
-      ? {
-          kind,
-          rotation,
-          cell: target.placeCell,
-          valid: canPlace(target.placeCell),
-        }
+    tool === "build" && placeCell
+      ? { kind, rotation, cell: placeCell, valid: canPlace(placeCell) }
       : null;
 
   // While dragging, show the piece where it would land
@@ -206,7 +250,7 @@ export function useEditor({ initialPieces, onDropMarble }: EditorOptions) {
         ? (drag?.pieceId ?? target?.pieceId ?? null)
         : null,
     onTargetChange,
-    onClick,
+    onClick: onBoardClick,
     onRightClick,
     onPointerDown,
     undo: history.undo,
