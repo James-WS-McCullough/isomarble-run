@@ -6,10 +6,11 @@ import {
 } from "./directions";
 import { marbleHeightAt, nearestOnRoute, routeToExit } from "./grooves";
 import { Path, routeBetween } from "./paths";
-import { hasGroove, pieceExits, piecePorts } from "./pieces";
+import { hasGroove, isTube, pieceExits, piecePorts } from "./pieces";
 import {
   depthOf,
   fromScreen,
+  GROOVE_REST_HEIGHT,
   MARBLE_RADIUS,
   SQRT2,
   SQRT6,
@@ -41,6 +42,10 @@ export const PHYSICS = {
   WALL_BOUNCE: 0.4,
   /** How bouncy marbles are when they hit each other (1 is perfectly) */
   MARBLE_BOUNCE: 0.9,
+  /** Speed marbles are blown up tubes by a fan */
+  AIR_SPEED: 4,
+  /** How quickly a fan gets a marble up to speed */
+  AIR_ACCELERATION: 30,
   /** Below this horizontal speed a landing marble counts as dropping straight down */
   DROP_SPEED: 0.6,
   /** How quickly small visual snaps are smoothed out */
@@ -66,6 +71,8 @@ export interface Marble {
     /** Side it rolled in from, or null if it landed on the piece */
     entry: Direction | null;
   } | null;
+  /** Set while inside a glass tube: the column it's in */
+  tube: { x: number; y: number } | null;
   /** Speed along the track while rolling */
   speed: number;
   /** Visible offset left over from a snap, eased away to hide the jump */
@@ -124,6 +131,12 @@ export class Simulation {
 
     const byId = new Map(pieces.map((piece) => [piece.id, piece]));
     for (const marble of this.marbles) {
+      if (
+        marble.tube &&
+        this.tubeCell(marble.tube, marble.position.z) === null
+      ) {
+        marble.tube = null;
+      }
       const rolling = marble.rolling;
       if (!rolling) continue;
       const piece = byId.get(rolling.piece.id);
@@ -148,6 +161,7 @@ export class Simulation {
       position: fromScreen(right, up, this.bounds.frontDepth),
       velocity: { x: 0, y: 0, z: 0 },
       rolling: null,
+      tube: null,
       speed: 0,
       visualOffset: { x: 0, y: 0, z: 0 },
       rolled: { x: 0, y: 0 },
@@ -179,6 +193,8 @@ export class Simulation {
     for (const marble of this.marbles) {
       if (marble.rolling) {
         this.stepRolling(marble, dt, events);
+      } else if (marble.tube) {
+        this.stepInTube(marble, dt, events);
       } else if (!this.stepFlying(marble, dt, events)) {
         events.push({ type: "removed", marbleId: marble.id });
         continue;
@@ -243,6 +259,7 @@ export class Simulation {
 
   private velocityOf(marble: Marble): Vec3 {
     const rolling = marble.rolling;
+    if (marble.tube) return { x: 0, y: 0, z: marble.velocity.z };
     if (!rolling) return marble.velocity;
     return scale(rolling.path.tangentAt(rolling.distance), marble.speed);
   }
@@ -253,6 +270,11 @@ export class Simulation {
    */
   private setVelocity(marble: Marble, velocity: Vec3) {
     const rolling = marble.rolling;
+    if (marble.tube) {
+      // Tubes only let marbles move up and down
+      marble.velocity = { x: 0, y: 0, z: velocity.z };
+      return;
+    }
     if (!rolling) {
       marble.velocity = velocity;
       return;
@@ -559,6 +581,142 @@ export class Simulation {
     return found && { piece: found.piece, point: found.point };
   }
 
+  /** Whether there's a tube (or outlet) at this height in a column */
+  private tubeAt(column: { x: number; y: number }, z: number): boolean {
+    const piece = this.track.pieceAt({ x: column.x, y: column.y, z });
+    return piece !== undefined && isTube(piece.kind);
+  }
+
+  /**
+   * Which tube in a column a marble at height `z` is inside, or null.
+   * Marbles enter and leave tubes level with the track, a little above the
+   * top of the tube's cell, so that counts as inside the tube below.
+   */
+  private tubeCell(column: { x: number; y: number }, z: number): number | null {
+    const cell = Math.round(z);
+    if (this.tubeAt(column, cell)) return cell;
+    if (this.tubeAt(column, cell - 1) && z < cell - 0.5 + 0.1) return cell - 1;
+    return null;
+  }
+
+  /** Start travelling inside the tube column a piece is part of */
+  private enterTube(
+    marble: Marble,
+    piece: Piece,
+    z: number,
+    verticalSpeed: number,
+  ) {
+    marble.rolling = null;
+    marble.tube = { x: piece.cell.x, y: piece.cell.y };
+    marble.velocity = { x: 0, y: 0, z: verticalSpeed };
+    this.snapTo(marble, { x: piece.cell.x, y: piece.cell.y, z });
+  }
+
+  /**
+   * Move up or down a column of tubes: falling, or blown up by a fan at the
+   * bottom. Marbles blown up to an outlet leave through its spout.
+   */
+  private stepInTube(marble: Marble, dt: number, events: SimulationEvent[]) {
+    const column = marble.tube;
+    if (!column) return;
+    const z = marble.position.z;
+    const cell = this.tubeCell(column, z);
+    if (cell === null) {
+      marble.tube = null;
+      return;
+    }
+
+    let bottom = cell;
+    while (this.tubeAt(column, bottom - 1)) bottom--;
+    let top = cell;
+    while (this.tubeAt(column, top + 1)) top++;
+    const base = this.track.pieceAt({
+      x: column.x,
+      y: column.y,
+      z: bottom - 1,
+    });
+    const blown = base?.kind === "fan";
+
+    const v = marble.velocity;
+    if (blown) {
+      const change = clamp(
+        PHYSICS.AIR_SPEED - v.z,
+        -PHYSICS.AIR_ACCELERATION * dt,
+        PHYSICS.AIR_ACCELERATION * dt,
+      );
+      v.z += change;
+    } else {
+      v.z = Math.max(v.z - PHYSICS.GRAVITY * dt, -PHYSICS.MAX_SPEED);
+    }
+    let after = z + v.z * dt;
+
+    if (v.z > 0) {
+      // Out of the spout of an outlet it rises past
+      for (let level = cell; level <= Math.round(after); level++) {
+        const piece = this.track.pieceAt({
+          x: column.x,
+          y: column.y,
+          z: level,
+        });
+        const spout = level + GROOVE_REST_HEIGHT;
+        if (piece?.kind === "outlet" && z < spout && after >= spout) {
+          this.leaveThroughSpout(marble, piece, v.z, events);
+          return;
+        }
+      }
+      // Out of the open top of the column, to fall back in (an outlet at
+      // the top is an elbow, so marbles leave through its spout instead)
+      const capped =
+        this.track.pieceAt({ x: column.x, y: column.y, z: top })?.kind ===
+        "outlet";
+      if (!capped && after > top + 0.5) {
+        marble.tube = null;
+        marble.headingForward = true;
+      }
+    } else if (base && !blown) {
+      // Dropping out of the bottom onto the piece below
+      const landing = bottom - 1 + restHeight(base.kind);
+      if (after <= landing) {
+        marble.tube = null;
+        this.land(
+          marble,
+          { piece: base, point: { x: column.x, y: column.y, z: landing } },
+          events,
+        );
+        return;
+      }
+    } else if (blown) {
+      // The fan keeps it from dropping into the fan itself
+      after = Math.max(after, bottom - 0.5 + MARBLE_RADIUS);
+    } else if (after < bottom - 0.5) {
+      // Out of the bottom into thin air
+      marble.tube = null;
+      marble.headingForward = false;
+    }
+
+    marble.position = { x: column.x, y: column.y, z: after };
+  }
+
+  private leaveThroughSpout(
+    marble: Marble,
+    outlet: Piece,
+    verticalSpeed: number,
+    events: SimulationEvent[],
+  ) {
+    const exit = piecePorts(outlet.kind, outlet.rotation)[0];
+    const v = DIRECTION_VECTORS[exit];
+    const path = pathOnPiece(outlet, [
+      { x: 0, y: 0 },
+      { x: v.x / 2, y: v.y / 2 },
+    ]);
+    marble.tube = null;
+    marble.velocity = { x: 0, y: 0, z: 0 };
+    marble.speed = Math.max(PHYSICS.CRUISE_SPEED, verticalSpeed * 0.8);
+    this.snapTo(marble, path.points[0]);
+    marble.rolling = { piece: outlet, path, distance: 0, exit, entry: null };
+    events.push({ type: "paint", pieceId: outlet.id, hue: marble.hue });
+  }
+
   private land(
     marble: Marble,
     landing: { piece: Piece; point: Vec3 },
@@ -566,6 +724,19 @@ export class Simulation {
   ) {
     const { piece, point } = landing;
     const v = marble.velocity;
+
+    // Falling into the top of a tube
+    if (isTube(piece.kind)) {
+      marble.position = point;
+      this.enterTube(marble, piece, point.z, v.z);
+      events.push({
+        type: "land",
+        marbleId: marble.id,
+        impact: Math.abs(v.z) / 3,
+      });
+      return;
+    }
+
     const horizontal = Math.hypot(v.x, v.y);
     const arriving = directionOfVelocity(v.x, v.y, PHYSICS.DROP_SPEED);
     const exit = this.pick(pieceExits(piece.kind, piece.rotation, arriving));
@@ -610,12 +781,30 @@ export class Simulation {
     events: SimulationEvent[],
   ) {
     const entrySide = oppositeDirection(arriving);
-    const throughSide =
-      hasGroove(piece.kind) &&
-      !piecePorts(piece.kind, piece.rotation).includes(entrySide);
+    const intoOpening = piecePorts(piece.kind, piece.rotation).includes(
+      entrySide,
+    );
+    const throughSide = hasGroove(piece.kind) && !intoOpening;
+    const { x, y, z } = piece.cell;
 
-    // From down in a groove, a side with no opening is a solid wall
-    if (throughSide && !fromFlat) {
+    // Rolling into an outlet's spout: drop down the tube
+    if (piece.kind === "outlet" && intoOpening) {
+      this.enterTube(marble, piece, z + restHeight(piece.kind), -0.5);
+      events.push({ type: "paint", pieceId: piece.id, hue: marble.hue });
+      return;
+    }
+    // Rolling into a fan's intake: blown up the tube above it
+    if (piece.kind === "fan" && intoOpening && this.tubeAt({ x, y }, z + 1)) {
+      this.enterTube(marble, piece, z + restHeight(piece.kind), 1);
+      events.push({ type: "paint", pieceId: piece.id, hue: marble.hue });
+      return;
+    }
+
+    // From down in a groove, a side with no opening is a solid wall, and
+    // the glass sides of a tube always are. So is a fan with nothing to
+    // blow the marble up into.
+    const deadEnd = piece.kind === "fan" && intoOpening;
+    if ((throughSide && (!fromFlat || isTube(piece.kind))) || deadEnd) {
       // Touch the wall at groove height, then head back
       const v = DIRECTION_VECTORS[entrySide];
       const wall = {

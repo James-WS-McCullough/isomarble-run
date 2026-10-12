@@ -4,7 +4,7 @@ import {
   type Direction,
   oppositeDirection,
 } from "./directions";
-import { hasGroove, type PieceKind } from "./pieces";
+import { hasGroove, isTube, type PieceKind } from "./pieces";
 import {
   type Cell,
   cellKey,
@@ -66,7 +66,10 @@ export class TrackIndex {
     }
 
     for (const piece of pieces) {
-      if (this.isCovered(piece)) continue;
+      const covered = this.isCovered(piece);
+      // Fans and tubes take marbles in through their sides even with more
+      // tube stacked on top; other pieces need a clear top
+      if (covered && !isTube(piece.kind) && piece.kind !== "fan") continue;
       const { x, y, z } = piece.cell;
 
       for (const side of DIRECTIONS) {
@@ -75,6 +78,7 @@ export class TrackIndex {
         addTo(this.ports, key, piece);
       }
 
+      if (covered) continue;
       addTo(
         this.columns,
         columnKey(x - z, y - z, restHeight(piece.kind)),
@@ -91,10 +95,16 @@ export class TrackIndex {
     return this.byCell.has(cellKey(cell));
   }
 
-  /** A piece with another piece on top has no usable top surface */
+  /**
+   * A piece with another piece on top has no usable top surface, except
+   * under a glass tube, which is hollow: marbles drop out of it onto the
+   * piece below
+   */
   isCovered(piece: Piece): boolean {
     const { x, y, z } = piece.cell;
-    return this.byCell.has(cellKey({ x, y, z: z + 1 }));
+    const above = this.byCell.get(cellKey({ x, y, z: z + 1 }));
+    if (!above) return false;
+    return !isTube(above.kind) || isTube(piece.kind) || piece.kind === "fan";
   }
 
   /**

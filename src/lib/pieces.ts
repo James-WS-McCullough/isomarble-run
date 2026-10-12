@@ -6,7 +6,10 @@ export type PieceKind =
   | "tee"
   | "cross"
   | "catcher"
-  | "block";
+  | "block"
+  | "tube"
+  | "outlet"
+  | "fan";
 
 interface PieceDefinition {
   kind: PieceKind;
@@ -77,6 +80,32 @@ const PIECE_DEFINITIONS: PieceDefinition[] = [
     ports: [],
     exits: (arriving) => (arriving ? [arriving] : ALL),
   },
+  {
+    // A vertical glass tube: marbles fall down it, or get blown up it
+    kind: "tube",
+    label: "Tube",
+    hotkey: "7",
+    ports: [],
+    exits: (arriving) => (arriving ? [arriving] : ALL),
+  },
+  {
+    // A tube with a spout: marbles blown up it leave through the spout, and
+    // marbles rolling into the spout drop down the tube
+    kind: "outlet",
+    label: "Outlet",
+    hotkey: "8",
+    ports: ["+x"],
+    exits: () => ["+x"],
+  },
+  {
+    // Blows marbles up the tubes stacked on top of it. Marbles roll in
+    // through the intake on its side.
+    kind: "fan",
+    label: "Fan",
+    hotkey: "9",
+    ports: ["+x"],
+    exits: (arriving) => (arriving ? [arriving] : ALL),
+  },
 ];
 
 export const PIECES = PIECE_DEFINITIONS;
@@ -108,7 +137,15 @@ export function pieceExits(
     .map((exit) => rotateDirection(exit, rotation));
 }
 
-/** Pieces with a groove hold the marble lower than a flat-topped block */
+/**
+ * Pieces with a groove hold the marble lower than a flat-topped block, and
+ * their sides without openings are walls. Tubes count: their sides are glass.
+ */
 export function hasGroove(kind: PieceKind): boolean {
-  return kind !== "block";
+  return kind !== "block" && kind !== "fan";
+}
+
+/** Glass tubes, which marbles travel up and down inside */
+export function isTube(kind: PieceKind): boolean {
+  return kind === "tube" || kind === "outlet";
 }

@@ -3,12 +3,13 @@ import {
   type Direction,
   oppositeDirection,
 } from "./directions";
-import { hasGroove, type PieceKind, piecePorts } from "./pieces";
+import { hasGroove, isTube, type PieceKind, piecePorts } from "./pieces";
 import {
   FLAT_REST_HEIGHT,
   GROOVE_DEPTH,
   GROOVE_HALF_WIDTH,
   GROOVE_PROFILE_RADIUS,
+  GROOVE_REST_HEIGHT,
   MARBLE_RADIUS,
 } from "./space";
 
@@ -88,6 +89,9 @@ export function grooveCentrelines(
         segment(CENTRE, portPoint(ports[0])),
       ];
     case "block":
+    case "tube":
+    case "outlet":
+    case "fan":
       return [];
   }
 }
@@ -162,6 +166,8 @@ export function marbleHeightAt(
   p: Point,
 ): number {
   if (!hasGroove(kind)) return FLAT_REST_HEIGHT;
+  // Marbles leave and enter tubes level with the track
+  if (isTube(kind)) return GROOVE_REST_HEIGHT;
   const lines = grooveCentrelines(kind, rotation);
   return Math.min(FLAT_REST_HEIGHT, surfaceHeight(lines, p) + MARBLE_RADIUS);
 }

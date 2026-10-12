@@ -41,6 +41,10 @@ export function PieceIcon({
     project(-0.5, 0.5),
   ];
 
+  if (kind === "tube" || kind === "outlet" || kind === "fan") {
+    return <SpecialIcon kind={kind} rotation={rotation} />;
+  }
+
   return (
     <svg
       width={SIZE}
@@ -72,6 +76,74 @@ export function PieceIcon({
           strokeWidth="6"
         />
       ))}
+    </svg>
+  );
+}
+
+/** Side-on icons for tubes and fans */
+function SpecialIcon({
+  kind,
+  rotation,
+}: {
+  kind: "tube" | "outlet" | "fan";
+  rotation: number;
+}) {
+  // Which way the spout or intake points on screen: right for +x and -y
+  const ports = piecePorts(kind, rotation);
+  const right = ports[0] === "+x" || ports[0] === "-y";
+  const glass = { fill: "#dff1fb", fillOpacity: 0.35, stroke: "#9fc6dc" };
+  return (
+    <svg
+      width={SIZE}
+      height={SIZE}
+      viewBox={`0 0 ${SIZE} ${SIZE}`}
+      aria-hidden="true"
+    >
+      {kind === "fan" ? (
+        <>
+          <rect
+            x="10"
+            y="14"
+            width="20"
+            height="20"
+            rx="2"
+            fill="#e2bc8a"
+            stroke="#8b5e34"
+          />
+          <ellipse cx="20" cy="14" rx="9" ry="3" fill="#2a1d14" />
+          <path
+            d="M14 13 L26 15 M14 15 L26 13"
+            stroke="#c9c2b8"
+            strokeWidth="1.5"
+          />
+          <path
+            d="M20 10 L20 3 M17 6 L20 3 L23 6"
+            stroke="#7dd3fc"
+            strokeWidth="1.5"
+            fill="none"
+          />
+          <circle cx={right ? 30 : 10} cy="17" r="3" fill="#2a1d14" />
+        </>
+      ) : (
+        <>
+          <rect x="13" y="4" width="14" height="32" rx="3" {...glass} />
+          <rect x="11" y="33" width="18" height="3" rx="1" fill="#c99c66" />
+          {kind === "tube" && (
+            <rect x="11" y="4" width="18" height="3" rx="1" fill="#c99c66" />
+          )}
+          {kind === "outlet" && (
+            <rect
+              x={right ? 26 : 2}
+              y="5"
+              width="12"
+              height="9"
+              rx="2"
+              {...glass}
+            />
+          )}
+          <circle cx="20" cy="22" r="4" fill="#4f9fd1" />
+        </>
+      )}
     </svg>
   );
 }

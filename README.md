@@ -15,7 +15,11 @@ An isometric wooden marble run where impossible tracks work. Build a run out of 
 | 🔮 Marble (M) | Click anywhere to drop a marble. |
 | 🧽 Erase (E) | Click a piece to remove it. |
 
-Pieces: **1** Straight, **2** Curve, **3** Splitter, **4** Crossing, **5** Catcher, **6** Block.
+Pieces: **1** Straight, **2** Curve, **3** Splitter, **4** Crossing, **5** Catcher, **6** Block, **7** Tube, **8** Outlet, **9** Fan.
+
+- **🧪 Tube**: a vertical glass pipe. Marbles that fall in the top drop down inside it and land on whatever is below.
+- **↪️ Outlet**: a tube with a spout. Marbles blown up to it shoot out of the spout onto the track; marbles rolling into the spout drop down the tube.
+- **🌀 Fan**: blows marbles up the tubes stacked on top of it. Marbles roll in through the intake on its side. A blown tube with no outlet makes a fountain.
 
 | Control | Action |
 | --- | --- |
@@ -97,6 +101,7 @@ src/
     PieceMesh.tsx         A wooden piece
     Marbles.tsx           Glass marbles that spin as they roll
     pieceGeometry.ts      Piece models, with rounded grooves carved into the top
+    TubePieces.tsx        Glass tubes, outlets and fans
     materials.ts          Stained wood and marble materials
     textures.ts           Procedural wood grain and marble swirl
 public/audio/             Sound effects
