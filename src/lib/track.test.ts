@@ -8,13 +8,13 @@ describe("tube columns", () => {
   it("spans every tube stacked together", () => {
     const track = new TrackIndex([at(1), at(2, "outlet"), at(3, "funnel")]);
     const column = track.tubeColumn({ x: 0, y: 0, z: 2 });
-    expect(column).toMatchObject({ bottom: 1, top: 3, capped: false });
+    expect(column).toMatchObject({ bottom: 1, top: 3, cappedTop: false });
     expect(track.tubeColumn({ x: 0, y: 0, z: 4 })).toBeUndefined();
   });
 
   it("is capped by an outlet at the top", () => {
     const track = new TrackIndex([at(1), at(2, "outlet")]);
-    expect(track.tubeColumn({ x: 0, y: 0, z: 1 })?.capped).toBe(true);
+    expect(track.tubeColumn({ x: 0, y: 0, z: 1 })?.cappedTop).toBe(true);
   });
 
   it("is blown by a fan right under it, or across a gap", () => {

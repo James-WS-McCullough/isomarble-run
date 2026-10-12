@@ -8,9 +8,11 @@ import {
 import {
   isFlatTopped,
   isTube,
+  isUpsideDown,
   joinsTubeAbove,
   type PieceKind,
   pieceLength,
+  portLevel,
 } from "./pieces";
 import {
   type Cell,
@@ -86,7 +88,12 @@ export interface TubeColumn {
    * Whether an outlet tops it off. That's an elbow, so whatever rises up
    * the column leaves through its spout rather than out of the top.
    */
-  capped: boolean;
+  cappedTop: boolean;
+  /**
+   * Whether an upside-down outlet is at the bottom: what drops down the
+   * column leaves through its spout, and no fan can blow up into it
+   */
+  cappedBottom: boolean;
   /** The piece right under its bottom, if any */
   base: Piece | undefined;
   /** The fan blowing up it: right under it, or below a gap its air crosses */
@@ -129,7 +136,9 @@ export class TrackIndex {
           ) {
             continue;
           }
-          const key = portKey(x + v.x / 2 - z, y + v.y / 2 - z, side);
+          // An upside-down piece's openings are a level down
+          const level = z + portLevel(piece);
+          const key = portKey(x + v.x / 2 - level, y + v.y / 2 - level, side);
           addTo(this.ports, key, piece);
         }
 
@@ -166,9 +175,16 @@ export class TrackIndex {
     let top = z;
     while (this.isTubeAt({ x, y, z: top + 1 })) top++;
 
+    const isElbow = (level: number, upsideDown: boolean) => {
+      const piece = this.pieceAt({ x, y, z: level });
+      return piece?.kind === "outlet" && isUpsideDown(piece) === upsideDown;
+    };
+    const cappedTop = isElbow(top, false);
+    const cappedBottom = isElbow(bottom, true);
+
     const base = this.pieceAt({ x, y, z: bottom - 1 });
-    let fan = base?.kind === "fan" ? base : undefined;
-    for (let gap = 1; !base && gap <= FAN_REACH; gap++) {
+    let fan = base?.kind === "fan" && !cappedBottom ? base : undefined;
+    for (let gap = 1; !base && !cappedBottom && gap <= FAN_REACH; gap++) {
       const below = this.pieceAt({ x, y, z: bottom - 1 - gap });
       if (!below) continue;
       if (below.kind === "fan") fan = below;
@@ -180,7 +196,8 @@ export class TrackIndex {
       y,
       bottom,
       top,
-      capped: this.pieceAt({ x, y, z: top })?.kind === "outlet",
+      cappedTop,
+      cappedBottom,
       base,
       fan,
     };
@@ -219,7 +236,7 @@ export class TrackIndex {
    * the one closest to the camera (the one you can see) wins.
    */
   findConnection(piece: Piece, direction: Direction): Piece | undefined {
-    return this.findConnectionFrom(piece.cell, direction, piece);
+    return this.findConnectionFrom(portCell(piece), direction, piece);
   }
 
   /** As findConnection, for a piece that would sit at `cell` */
@@ -238,7 +255,7 @@ export class TrackIndex {
     return frontmost(
       (this.ports.get(key) ?? []).filter(
         (other) =>
-          other !== exclude && looksJoined(cell, other.cell, direction),
+          other !== exclude && looksJoined(cell, portCell(other), direction),
       ),
     );
   }
@@ -250,6 +267,13 @@ export class TrackIndex {
   piecesInColumn(column: { a: number; b: number }, rest: number): Piece[] {
     return this.columns.get(columnKey(column.a, column.b, rest)) ?? [];
   }
+}
+
+/** The cell a piece's side openings belong to */
+export function portCell(
+  piece: Pick<Piece, "kind" | "rotation" | "cell">,
+): Cell {
+  return { ...piece.cell, z: piece.cell.z + portLevel(piece) };
 }
 
 /**

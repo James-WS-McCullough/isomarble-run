@@ -6,6 +6,7 @@ import {
   isTube,
   type PieceKind,
   piecePorts,
+  portLevel,
 } from "./pieces";
 import {
   FLAT_REST_HEIGHT,
@@ -108,8 +109,9 @@ export function marbleHeightAt(
   p: Point,
 ): number {
   if (isFlatTopped(kind)) return FLAT_REST_HEIGHT;
-  // Marbles leave and enter tubes level with the track
-  if (isTube(kind)) return GROOVE_REST_HEIGHT;
+  // Marbles leave and enter tubes level with the track: the track a level
+  // down, for an upside-down outlet's spout
+  if (isTube(kind)) return GROOVE_REST_HEIGHT + portLevel({ kind, rotation });
   const lines = grooveCentrelines(kind, rotation);
   return Math.min(FLAT_REST_HEIGHT, surfaceHeight(lines, p) + MARBLE_RADIUS);
 }

@@ -1,4 +1,3 @@
-import type { PieceKind } from "./pieces";
 import { MARBLE_RADIUS } from "./space";
 
 /**
@@ -32,12 +31,4 @@ export function funnelRoom(height: number): number {
   const mouthRoom = FUNNEL.MOUTH_RADIUS - MARBLE_RADIUS;
   const f = (height - FUNNEL.NECK_HEIGHT) / (top - FUNNEL.NECK_HEIGHT);
   return mouthRoom * Math.min(1, Math.max(0, f));
-}
-
-/** Funnels turned an odd number of times are upside down, mouth facing down */
-export function isUpsideDown(piece: {
-  kind: PieceKind;
-  rotation: number;
-}): boolean {
-  return piece.kind === "funnel" && piece.rotation % 2 === 1;
 }

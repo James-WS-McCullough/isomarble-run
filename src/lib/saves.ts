@@ -1,4 +1,4 @@
-import { PIECES, type PieceKind } from "./pieces";
+import { normaliseRotation, PIECES, type PieceKind } from "./pieces";
 import { createPiece, type Piece } from "./track";
 
 /**
@@ -59,7 +59,15 @@ export function decodePieces(stored: unknown): Piece[] {
       continue;
     }
     pieces.push(
-      createPiece(kind as PieceKind, ((rotation % 4) + 4) % 4, { x, y, z }),
+      createPiece(
+        kind as PieceKind,
+        normaliseRotation(kind as PieceKind, rotation),
+        {
+          x,
+          y,
+          z,
+        },
+      ),
     );
   }
   return pieces;

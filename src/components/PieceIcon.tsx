@@ -1,7 +1,11 @@
 import type { JSX, ReactNode } from "react";
 import type { Centreline, Point } from "@/lib/centrelines";
-import { isUpsideDown } from "@/lib/funnel";
-import { grooveCentrelines, type PieceKind, piecePorts } from "@/lib/pieces";
+import {
+  grooveCentrelines,
+  isUpsideDown,
+  type PieceKind,
+  piecePorts,
+} from "@/lib/pieces";
 
 const SIZE = 40;
 const SCALE = 27;
@@ -60,7 +64,8 @@ export function PieceIcon({ kind, rotation }: IconProps) {
   );
 }
 
-function Icon({ children }: { children: ReactNode }) {
+/** An icon's frame; `flip` turns the drawing upside down */
+function Icon({ children, flip }: { children: ReactNode; flip?: boolean }) {
   return (
     <svg
       width={SIZE}
@@ -68,7 +73,9 @@ function Icon({ children }: { children: ReactNode }) {
       viewBox={`0 0 ${SIZE} ${SIZE}`}
       aria-hidden="true"
     >
-      {children}
+      <g transform={flip ? `matrix(1 0 0 -1 0 ${SIZE})` : undefined}>
+        {children}
+      </g>
     </svg>
   );
 }
@@ -117,13 +124,17 @@ function FanDetails() {
   );
 }
 
-/** A glass tube side-on, with a spout on the side for an outlet */
+/**
+ * A glass tube side-on, with a spout on the side for an outlet: at the
+ * bottom when it's upside down
+ */
 function TubeIcon({ kind, rotation }: IconProps) {
   // Which way the spout points on screen: right for +x and -y
   const spout = piecePorts(kind, rotation)[0];
   const right = spout === "+x" || spout === "-y";
+  const flip = isUpsideDown({ kind, rotation });
   return (
-    <Icon>
+    <Icon flip={flip}>
       <rect x="13" y="4" width="14" height="32" rx="3" {...GLASS} />
       <rect x="11" y="33" width="18" height="3" rx="1" fill={COLLAR} />
       {spout ? (
@@ -145,22 +156,19 @@ function TubeIcon({ kind, rotation }: IconProps) {
 
 /** A funnel side-on; upside down, it's flipped and marbles go up it */
 function FunnelIcon({ rotation }: IconProps) {
-  const flip = isUpsideDown({ kind: "funnel", rotation });
   return (
-    <Icon>
-      <g transform={flip ? `matrix(1 0 0 -1 0 ${SIZE})` : undefined}>
-        <path d="M5 5 L35 5 L27 18 L13 18 Z" {...GLASS} />
-        <rect x="13" y="17" width="14" height="19" rx="2" {...GLASS} />
-        <rect x="4" y="3" width="32" height="3" rx="1" fill={COLLAR} />
-        <rect x="11" y="33" width="18" height="3" rx="1" fill={COLLAR} />
-        <circle cx="13" cy="9" r="4" fill={MARBLE} />
-        <path
-          d="M20 22 L20 29 M17 26 L20 29 L23 26"
-          stroke="#7dd3fc"
-          strokeWidth="1.5"
-          fill="none"
-        />
-      </g>
+    <Icon flip={isUpsideDown({ kind: "funnel", rotation })}>
+      <path d="M5 5 L35 5 L27 18 L13 18 Z" {...GLASS} />
+      <rect x="13" y="17" width="14" height="19" rx="2" {...GLASS} />
+      <rect x="4" y="3" width="32" height="3" rx="1" fill={COLLAR} />
+      <rect x="11" y="33" width="18" height="3" rx="1" fill={COLLAR} />
+      <circle cx="13" cy="9" r="4" fill={MARBLE} />
+      <path
+        d="M20 22 L20 29 M17 26 L20 29 L23 26"
+        stroke="#7dd3fc"
+        strokeWidth="1.5"
+        fill="none"
+      />
     </Icon>
   );
 }

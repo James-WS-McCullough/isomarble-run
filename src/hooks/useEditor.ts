@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { PIECES, type PieceKind } from "@/lib/pieces";
+import { normaliseRotation, PIECES, type PieceKind } from "@/lib/pieces";
 import { fitsAt, slideCell, snapToJoins } from "@/lib/placement";
 import { type Cell, cellKey, type Vec3 } from "@/lib/space";
 import { createPiece, type Piece } from "@/lib/track";
@@ -68,7 +68,10 @@ export function useEditor({
     history.commit(
       pieces.map((piece) =>
         piece.id === pieceId
-          ? { ...piece, rotation: (piece.rotation + turns + 4) % 4 }
+          ? {
+              ...piece,
+              rotation: normaliseRotation(piece.kind, piece.rotation + turns),
+            }
           : piece,
       ),
     );
@@ -172,6 +175,8 @@ export function useEditor({
 
   const choosePiece = (next: PieceKind) => {
     setKind(next);
+    // Some pieces turn fewer or more ways than others
+    setRotation((current) => normaliseRotation(next, current));
     setTool("build");
   };
 
@@ -179,7 +184,7 @@ export function useEditor({
     if (tool === "move" && target?.pieceId) {
       rotatePiece(target.pieceId, turns);
     } else {
-      setRotation((current) => (current + turns + 4) % 4);
+      setRotation((current) => normaliseRotation(kind, current + turns));
     }
   };
 

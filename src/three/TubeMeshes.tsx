@@ -1,7 +1,8 @@
 "use client";
 
 import * as THREE from "three";
-import { FUNNEL, isUpsideDown } from "@/lib/funnel";
+import { FUNNEL } from "@/lib/funnel";
+import { isUpsideDown } from "@/lib/pieces";
 import { GROOVE_REST_HEIGHT } from "@/lib/space";
 import type { PieceLook } from "./materials";
 import type { ModelProps } from "./PieceMesh";
@@ -111,11 +112,24 @@ export function GlassTube({ look, raycast }: ModelProps) {
   );
 }
 
-/** A glass tube that bends out through a spout on its +x side */
-export function GlassOutlet({ look, raycast }: ModelProps) {
+/**
+ * The spout of an upside-down outlet is level with the track one level
+ * down. Mirroring the outlet top to bottom about this height puts it there.
+ */
+const FLIP_HEIGHT = GROOVE_REST_HEIGHT - 0.5;
+
+/**
+ * A glass tube that bends out through a spout on its +x side: at the top,
+ * or at the bottom when it's upside down
+ */
+export function GlassOutlet({ rotation, look, raycast }: ModelProps) {
   const wood = collarMaterial;
+  const upsideDown = isUpsideDown({ kind: "outlet", rotation });
   return (
-    <>
+    <group
+      position={[0, upsideDown ? 2 * FLIP_HEIGHT : 0, 0]}
+      scale={[1, upsideDown ? -1 : 1, 1]}
+    >
       <mesh
         geometry={outletTubeGeometry}
         material={glass(look)}
@@ -129,7 +143,7 @@ export function GlassOutlet({ look, raycast }: ModelProps) {
         position={[0, -0.46, 0]}
         raycast={raycast}
       />
-    </>
+    </group>
   );
 }
 

@@ -3,8 +3,7 @@ import {
   type Direction,
   oppositeDirection,
 } from "../directions";
-import { isUpsideDown } from "../funnel";
-import { type PieceKind, piecePorts } from "../pieces";
+import { isUpsideDown, type PieceKind, piecePorts } from "../pieces";
 import type { Vec3 } from "../space";
 import { type Piece, restHeight, type TrackIndex } from "../track";
 import {
@@ -100,8 +99,10 @@ export const BEHAVIOURS: Partial<Record<PieceKind, PieceBehaviour>> = {
   outlet: {
     land: intoTheTop,
     // Rolling into an outlet's spout: drop down the tube. Its other sides
-    // are glass walls.
+    // are glass walls. Upside down, the spout's at the capped bottom, so
+    // the marble just rolls in and back out.
     rollIn(_world, marble, piece, arriving, events) {
+      if (isUpsideDown(piece)) return false;
       const entrySide = oppositeDirection(arriving);
       if (!piecePorts(piece.kind, piece.rotation).includes(entrySide)) {
         return false;

@@ -32,7 +32,7 @@ export function airStreams(track: TrackIndex): AirStream[] {
 
     if (column) {
       // Up the column and out of its top, or its spout if an outlet caps it
-      const to = column.top + (column.capped ? GROOVE_REST_HEIGHT : 0.5);
+      const to = column.top + (column.cappedTop ? GROOVE_REST_HEIGHT : 0.5);
       streams.push({ x, y, from, to, tubeFrom: column.bottom - 0.5 });
     } else if (reached) {
       streams.push({ x, y, from, to: reached.cell.z - 0.5, tubeFrom: null });

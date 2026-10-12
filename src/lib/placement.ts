@@ -1,7 +1,7 @@
 import { DIRECTIONS, oppositeDirection } from "./directions";
 import { isFlatTopped, type PieceKind, piecePorts } from "./pieces";
 import { type Cell, cellKey } from "./space";
-import { footprint, type Piece, TrackIndex } from "./track";
+import { footprint, type Piece, portCell, TrackIndex } from "./track";
 
 /** Pieces can go this far below the floor, for joins that need to be low */
 export const LOWEST_LEVEL = -12;
@@ -27,7 +27,10 @@ export function countJoins(
   const sides = isFlatTopped(kind) ? DIRECTIONS : piecePorts(kind, rotation);
   let joins = 0;
   for (const side of sides) {
-    const neighbour = track.findConnectionFrom(cell, side);
+    const neighbour = track.findConnectionFrom(
+      portCell({ kind, rotation, cell }),
+      side,
+    );
     if (!neighbour) continue;
     const opening = oppositeDirection(side);
     if (

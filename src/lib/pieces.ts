@@ -56,6 +56,14 @@ interface PieceDefinition {
   open?: boolean;
   /** How many tiles long it is along its x axis, centred on its own tile */
   length?: number;
+  /**
+   * How many ways R can turn it: the four directions, unless it's round
+   * (fewer) or can also be flipped upside down (the upside-down turns come
+   * after the upright ones)
+   */
+  orientations?: number;
+  /** Whether turning it can flip it upside down */
+  flips?: boolean;
 }
 
 const ALL: Direction[] = ["+x", "+y", "-x", "-y"];
@@ -136,6 +144,9 @@ const PIECE_DEFINITIONS: PieceDefinition[] = [
     exits: ANY_WAY,
     grooves: [],
     tube: true,
+    // It's round, so turning it just flips it over
+    orientations: 2,
+    flips: true,
   },
   {
     kind: "block",
@@ -157,8 +168,10 @@ const PIECE_DEFINITIONS: PieceDefinition[] = [
     tube: true,
   },
   {
-    // A tube with a spout: marbles blown up it leave through the spout, and
-    // marbles rolling into the spout drop down the tube
+    // A tube with a spout at the top: marbles blown up it leave through the
+    // spout, and marbles rolling into the spout drop down the tube. Upside
+    // down, the spout is at the bottom: marbles dropping down the tube come
+    // out of it onto the track one level down.
     kind: "outlet",
     label: "Outlet",
     hotkey: "8",
@@ -166,6 +179,8 @@ const PIECE_DEFINITIONS: PieceDefinition[] = [
     exits: () => ["+x"],
     grooves: [],
     tube: true,
+    orientations: 8,
+    flips: true,
   },
   {
     // A crossroads with a fan set into the middle: marbles that roll or
@@ -265,4 +280,38 @@ export function isSolid(kind: PieceKind): boolean {
 /** How many tiles long a piece is along its x axis */
 export function pieceLength(kind: PieceKind): number {
   return getPiece(kind).length ?? 1;
+}
+
+/** How many ways R can turn a piece */
+export function orientations(kind: PieceKind): number {
+  return getPiece(kind).orientations ?? 4;
+}
+
+/** A rotation brought into range for a kind of piece */
+export function normaliseRotation(kind: PieceKind, rotation: number): number {
+  const count = orientations(kind);
+  return ((rotation % count) + count) % count;
+}
+
+/** Whether a piece is turned upside down: its later turns, if it flips */
+export function isUpsideDown(piece: {
+  kind: PieceKind;
+  rotation: number;
+}): boolean {
+  if (getPiece(piece.kind).flips !== true) return false;
+  const turn = normaliseRotation(piece.kind, piece.rotation);
+  return turn >= orientations(piece.kind) / 2;
+}
+
+/**
+ * How many levels below a piece its side openings are. An upside-down
+ * piece's are at its bottom, level with the track one level down. (A piece
+ * with no openings, like a funnel, stays where it is.)
+ */
+export function portLevel(piece: {
+  kind: PieceKind;
+  rotation: number;
+}): number {
+  const hasOpenings = getPiece(piece.kind).ports.length > 0;
+  return hasOpenings && isUpsideDown(piece) ? -1 : 0;
 }

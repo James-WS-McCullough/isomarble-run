@@ -1,6 +1,6 @@
 import { DIRECTION_VECTORS } from "../directions";
-import { FUNNEL, funnelRoom, isUpsideDown } from "../funnel";
-import { isTube, piecePorts } from "../pieces";
+import { FUNNEL, funnelRoom } from "../funnel";
+import { isTube, isUpsideDown, piecePorts, portLevel } from "../pieces";
 import { GROOVE_REST_HEIGHT, MARBLE_RADIUS, type Vec3 } from "../space";
 import { type Piece, restHeight, type TrackIndex } from "../track";
 import {
@@ -158,24 +158,16 @@ export function stepInTube(
   let after = z + v.z * dt;
   swirl(track, tube, cell, after, dt);
 
+  const outlet = spoutPassed(track, tube, z, after);
+  if (outlet) {
+    leaveThroughSpout(marble, outlet, Math.abs(v.z), events);
+    return null;
+  }
+
   if (v.z > 0) {
-    // Out of the spout of an outlet it rises past. The spout is a little
-    // above the outlet's centre, so check the cell below too.
-    for (let level = cell - 1; level <= Math.round(after); level++) {
-      const piece = track.pieceAt({
-        x: tube.x,
-        y: tube.y,
-        z: level,
-      });
-      const spout = level + GROOVE_REST_HEIGHT;
-      if (piece?.kind === "outlet" && z < spout && after >= spout) {
-        leaveThroughSpout(marble, piece, v.z, events);
-        return null;
-      }
-    }
     // Out of the open top of the column, to fall back in (an outlet at
     // the top is an elbow, so marbles leave through its spout instead)
-    if (!column.capped && after > top + 0.5) {
+    if (!column.cappedTop && after > top + 0.5) {
       marble.motion = FLYING;
       marble.headingForward = true;
     }
@@ -206,6 +198,34 @@ export function stepInTube(
     z: after,
   });
   return null;
+}
+
+/**
+ * The outlet whose spout a marble passes moving from `from` to `to` up or
+ * down a column, if any: rising past the spout of one the right way up, or
+ * dropping past the spout of one upside down
+ */
+function spoutPassed(
+  track: TrackIndex,
+  column: { x: number; y: number },
+  from: number,
+  to: number,
+): Piece | undefined {
+  const rising = to > from;
+  // Spouts sit a little above or below the outlet's middle, so check the
+  // cells either side too
+  const low = Math.round(Math.min(from, to)) - 1;
+  const high = Math.round(Math.max(from, to)) + 1;
+  for (let level = low; level <= high; level++) {
+    const piece = track.pieceAt({ x: column.x, y: column.y, z: level });
+    if (piece?.kind !== "outlet" || isUpsideDown(piece) === rising) continue;
+    const spout = level + GROOVE_REST_HEIGHT + portLevel(piece);
+    const passed = rising
+      ? from < spout && to >= spout
+      : from > spout && to <= spout;
+    if (passed) return piece;
+  }
+  return undefined;
 }
 
 /**
