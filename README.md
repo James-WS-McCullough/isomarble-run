@@ -86,7 +86,16 @@ src/
     useHistory.ts         Undo/redo for any value
     useSaves.ts           Saved runs in local storage
   lib/
-    simulation.ts         Marble physics, landing and the "looks connected" rule
+    simulation/           Marble physics
+      index.ts            The simulation: stepping marbles, landing and rolling onto pieces
+      marble.ts           A marble and what it's doing (flying, rolling, in a tube, held)
+      landing.ts          Where a falling marble lands: the "looks connected" rule
+      tubes.ts            Tubes, funnels, outlets and fans
+      seesaws.ts          Cup seesaws
+      collisions.ts       Marbles bumping into each other
+      walls.ts            Bouncing off the sides of pieces
+      routes.ts           Paths across pieces
+      physics.ts          Tuning: gravity, speeds and bounciness
     track.ts              Placed pieces and fast lookups by on-screen position
     pieces.ts             Piece types and where each sends a marble
     grooves.ts            Groove shapes, shared by the 3D models and the physics

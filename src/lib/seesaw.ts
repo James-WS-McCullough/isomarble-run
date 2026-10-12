@@ -19,6 +19,8 @@ export const SEESAW = {
   TIP_SPEED: 4,
   /** Height of a held marble's centre above the beam, resting in its cup */
   MARBLE_LIFT: MARBLE_RADIUS + 0.06,
+  /** Upward speed of a marble bouncing off a cup that's already full */
+  BOUNCE_UP: 2.5,
   /** Launch speed of the flung marble: up, and outwards */
   LAUNCH_UP: 8.5,
   LAUNCH_OUT: 1.5,
