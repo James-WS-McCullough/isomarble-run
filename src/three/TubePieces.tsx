@@ -3,6 +3,7 @@
 import { useFrame } from "@react-three/fiber";
 import { useRef } from "react";
 import * as THREE from "three";
+import { FUNNEL } from "@/lib/funnel";
 import { GROOVE_REST_HEIGHT } from "@/lib/space";
 import {
   getPieceMaterial,
@@ -12,7 +13,7 @@ import {
 import { getPieceGeometry } from "./pieceGeometry";
 
 /**
- * Tubes, outlets and fans. They're built unrotated with their opening
+ * Tubes, outlets, funnels and fans. They're built unrotated with their opening
  * (spout or intake) facing +x; the parent group rotates them.
  */
 
@@ -137,6 +138,48 @@ export function GlassOutlet({ look, raycast }: TubeProps) {
       <mesh
         geometry={collarGeometry}
         material={wood}
+        position={[0, -0.46, 0]}
+        raycast={raycast}
+      />
+    </>
+  );
+}
+
+// The funnel: a cone from the mouth down to the neck, then a short pipe
+const coneGeometry = new THREE.LatheGeometry(
+  [
+    new THREE.Vector2(FUNNEL.NECK_RADIUS, FUNNEL.NECK_HEIGHT),
+    new THREE.Vector2(FUNNEL.MOUTH_RADIUS, 0.5),
+  ],
+  40,
+);
+const pipeGeometry = new THREE.CylinderGeometry(
+  FUNNEL.NECK_RADIUS,
+  FUNNEL.NECK_RADIUS,
+  0.5 + FUNNEL.NECK_HEIGHT,
+  32,
+  1,
+  true,
+);
+pipeGeometry.translate(0, (FUNNEL.NECK_HEIGHT - 0.5) / 2, 0);
+const rimGeometry = new THREE.TorusGeometry(FUNNEL.MOUTH_RADIUS, 0.03, 8, 40);
+rimGeometry.rotateX(Math.PI / 2);
+
+/** A wide glass funnel with a wooden rim, narrowing into a tube */
+export function GlassFunnel({ look, raycast }: TubeProps) {
+  return (
+    <>
+      <mesh geometry={coneGeometry} material={glass(look)} raycast={raycast} />
+      <mesh geometry={pipeGeometry} material={glass(look)} raycast={raycast} />
+      <mesh
+        geometry={rimGeometry}
+        material={collarMaterial}
+        position={[0, 0.49, 0]}
+        raycast={raycast}
+      />
+      <mesh
+        geometry={collarGeometry}
+        material={collarMaterial}
         position={[0, -0.46, 0]}
         raycast={raycast}
       />

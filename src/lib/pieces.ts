@@ -9,6 +9,7 @@ export type PieceKind =
   | "block"
   | "tube"
   | "outlet"
+  | "funnel"
   | "fan"
   | "seesaw";
 
@@ -73,6 +74,15 @@ const PIECE_DEFINITIONS: PieceDefinition[] = [
     hotkey: "5",
     ports: ["+x"],
     exits: () => ["+x"],
+  },
+  {
+    // A wide glass funnel on top of a tube: marbles that land anywhere on
+    // it, or roll in over its rim, spiral down into the tube below
+    kind: "funnel",
+    label: "Funnel",
+    hotkey: "f",
+    ports: [],
+    exits: (arriving) => (arriving ? [arriving] : ALL),
   },
   {
     kind: "block",
@@ -158,5 +168,5 @@ export function hasGroove(kind: PieceKind): boolean {
 
 /** Glass tubes, which marbles travel up and down inside */
 export function isTube(kind: PieceKind): boolean {
-  return kind === "tube" || kind === "outlet";
+  return kind === "tube" || kind === "outlet" || kind === "funnel";
 }

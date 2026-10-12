@@ -4,6 +4,7 @@ import {
   directionOfVelocity,
   oppositeDirection,
 } from "./directions";
+import { FUNNEL, funnelRoom } from "./funnel";
 import { marbleHeightAt, nearestOnRoute, routeToExit } from "./grooves";
 import { Path, routeBetween } from "./paths";
 import { hasGroove, isTube, pieceExits, piecePorts } from "./pieces";
@@ -21,6 +22,22 @@ import {
   visiblePart,
 } from "./space";
 import { type Piece, REST_HEIGHTS, restHeight, TrackIndex } from "./track";
+
+/** A marble inside a column of tubes */
+interface TubeState {
+  /** The column it's in */
+  x: number;
+  y: number;
+  /** How far it is from the middle of the column, circling a funnel */
+  offset: { x: number; y: number };
+  /** Which way it circles round a funnel (±1) */
+  spin: number;
+  /**
+   * Dropped in from above: it sinks to the bottom before a fan can blow it
+   * back up, so it reaches the outlets below where it came in
+   */
+  sinking: boolean;
+}
 
 /** Tuning for how marbles move. Distances are in grid cells. */
 export const PHYSICS = {
@@ -72,8 +89,8 @@ export interface Marble {
     /** Side it rolled in from, or null if it landed on the piece */
     entry: Direction | null;
   } | null;
-  /** Set while inside a glass tube: the column it's in */
-  tube: { x: number; y: number } | null;
+  /** Set while inside a glass tube */
+  tube: TubeState | null;
   /** Set while waiting in a seesaw's cup: the seesaw and which end (±1) */
   held: { piece: Piece; side: number } | null;
   /** Speed along the track while rolling */
@@ -726,17 +743,53 @@ export class Simulation {
     return null;
   }
 
-  /** Start travelling inside the tube column a piece is part of */
+  /**
+   * Start travelling inside the tube column a piece is part of. A marble
+   * dropping in from above sinks to the bottom first; one coming in over a
+   * funnel's rim starts where it came in (`from`) and circles down.
+   */
   private enterTube(
     marble: Marble,
     piece: Piece,
     z: number,
     verticalSpeed: number,
+    from?: Vec3,
   ) {
+    const { x, y } = piece.cell;
+    const offset =
+      from && piece.kind === "funnel"
+        ? { x: from.x - x, y: from.y - y }
+        : { x: 0, y: 0 };
+    // Circle the way it was already heading round the middle
+    const v = marble.velocity;
+    const spin = offset.x * v.y - offset.y * v.x < 0 ? -1 : 1;
+
     marble.rolling = null;
-    marble.tube = { x: piece.cell.x, y: piece.cell.y };
+    marble.tube = { x, y, offset, spin, sinking: verticalSpeed < 0 };
     marble.velocity = { x: 0, y: 0, z: verticalSpeed };
-    this.snapTo(marble, { x: piece.cell.x, y: piece.cell.y, z });
+    this.snapTo(marble, { x: x + offset.x, y: y + offset.y, z });
+  }
+
+  /** Circle round a funnel, closing in on the middle as the marble drops */
+  private swirl(tube: TubeState, cell: number, z: number, dt: number) {
+    const piece = this.track.pieceAt({ x: tube.x, y: tube.y, z: cell });
+    const room = piece?.kind === "funnel" ? funnelRoom(z - cell) : 0;
+    const { offset } = tube;
+    const distance = Math.hypot(offset.x, offset.y);
+    if (distance === 0) return;
+
+    // Slide in off the rim, then keep against the cone as it narrows
+    const target =
+      distance > room
+        ? Math.max(room, distance - FUNNEL.SLIDE_IN * dt)
+        : distance;
+    const angle =
+      Math.atan2(offset.y, offset.x) +
+      (tube.spin * FUNNEL.SWIRL_SPEED * dt) / Math.max(distance, 0.1);
+    tube.offset =
+      target < 0.005
+        ? { x: 0, y: 0 }
+        : { x: Math.cos(angle) * target, y: Math.sin(angle) * target };
   }
 
   /**
@@ -765,7 +818,8 @@ export class Simulation {
     const blown = base?.kind === "fan";
 
     const v = marble.velocity;
-    if (blown) {
+    const circling = column.offset.x !== 0 || column.offset.y !== 0;
+    if (blown && !column.sinking && !circling) {
       const change = clamp(
         PHYSICS.AIR_SPEED - v.z,
         -PHYSICS.AIR_ACCELERATION * dt,
@@ -774,12 +828,16 @@ export class Simulation {
       v.z += change;
     } else {
       v.z = Math.max(v.z - PHYSICS.GRAVITY * dt, -PHYSICS.MAX_SPEED);
+      // Rolling round the cone of a funnel holds it back
+      if (circling) v.z = Math.max(v.z, -FUNNEL.SWIRL_DROP);
     }
     let after = z + v.z * dt;
+    this.swirl(column, cell, after, dt);
 
     if (v.z > 0) {
-      // Out of the spout of an outlet it rises past
-      for (let level = cell; level <= Math.round(after); level++) {
+      // Out of the spout of an outlet it rises past. The spout is a little
+      // above the outlet's centre, so check the cell below too.
+      for (let level = cell - 1; level <= Math.round(after); level++) {
         const piece = this.track.pieceAt({
           x: column.x,
           y: column.y,
@@ -813,15 +871,25 @@ export class Simulation {
         return;
       }
     } else if (blown) {
-      // The fan keeps it from dropping into the fan itself
-      after = Math.max(after, bottom - 0.5 + MARBLE_RADIUS);
+      // The fan keeps it from dropping into the fan itself, and blows it
+      // back up once it gets there
+      const floor = bottom - 0.5 + MARBLE_RADIUS;
+      if (after <= floor) {
+        after = floor;
+        column.sinking = false;
+        v.z = Math.max(v.z, 0);
+      }
     } else if (after < bottom - 0.5) {
       // Out of the bottom into thin air
       marble.tube = null;
       marble.headingForward = false;
     }
 
-    marble.position = { x: column.x, y: column.y, z: after };
+    this.rollTo(marble, {
+      x: column.x + column.offset.x,
+      y: column.y + column.offset.y,
+      z: after,
+    });
   }
 
   private leaveThroughSpout(
@@ -858,10 +926,10 @@ export class Simulation {
       return;
     }
 
-    // Falling into the top of a tube
+    // Falling into the top of a tube, or anywhere on a funnel
     if (isTube(piece.kind)) {
       marble.position = point;
-      this.enterTube(marble, piece, point.z, v.z);
+      this.enterTube(marble, piece, point.z, Math.min(v.z, 0), point);
       events.push({
         type: "land",
         marbleId: marble.id,
@@ -926,6 +994,25 @@ export class Simulation {
       marble.velocity = { x: v.x * marble.speed, y: v.y * marble.speed, z: 0 };
       marble.rolling = null;
       this.landOnSeesaw(marble, piece, events);
+      return;
+    }
+
+    // Rolling in over a funnel's rim: circle down into it
+    if (piece.kind === "funnel") {
+      const v = DIRECTION_VECTORS[entrySide];
+      const rim = {
+        x: x + v.x / 2,
+        y: y + v.y / 2,
+        z: z + restHeight(piece.kind),
+      };
+      const heading = DIRECTION_VECTORS[arriving];
+      marble.velocity = {
+        x: heading.x * marble.speed,
+        y: heading.y * marble.speed,
+        z: 0,
+      };
+      this.enterTube(marble, piece, rim.z, -0.01, rim);
+      events.push({ type: "paint", pieceId: piece.id, hue: marble.hue });
       return;
     }
 

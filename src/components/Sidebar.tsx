@@ -156,7 +156,7 @@ export function Sidebar(props: SidebarProps) {
                 key={piece.kind}
                 onClick={() => props.onPieceChange(piece.kind)}
                 aria-pressed={selected}
-                title={`${piece.label} (${piece.hotkey})`}
+                title={`${piece.label} (${piece.hotkey.toUpperCase()})`}
                 className={`p-1 rounded border flex flex-col items-center text-[11px] transition-colors ${
                   selected
                     ? "border-amber-500 bg-amber-900/40"

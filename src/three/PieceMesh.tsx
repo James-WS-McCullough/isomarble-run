@@ -9,7 +9,7 @@ import {
 } from "./materials";
 import { getPieceGeometry } from "./pieceGeometry";
 import { Seesaw } from "./SeesawMesh";
-import { Fan, GlassOutlet, GlassTube } from "./TubePieces";
+import { Fan, GlassFunnel, GlassOutlet, GlassTube } from "./TubePieces";
 
 interface PieceMeshProps {
   kind: PieceKind;
@@ -49,9 +49,18 @@ export function PieceMesh({
     );
   }
 
-  if (kind === "tube" || kind === "outlet" || kind === "fan") {
-    const Special =
-      kind === "tube" ? GlassTube : kind === "outlet" ? GlassOutlet : Fan;
+  if (
+    kind === "tube" ||
+    kind === "outlet" ||
+    kind === "funnel" ||
+    kind === "fan"
+  ) {
+    const Special = {
+      tube: GlassTube,
+      outlet: GlassOutlet,
+      funnel: GlassFunnel,
+      fan: Fan,
+    }[kind];
     return (
       <group {...placement}>
         <Special hue={hue} look={look} raycast={raycast} />

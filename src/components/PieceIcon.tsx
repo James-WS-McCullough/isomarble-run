@@ -41,7 +41,12 @@ export function PieceIcon({
     project(-0.5, 0.5),
   ];
 
-  if (kind === "tube" || kind === "outlet" || kind === "fan") {
+  if (
+    kind === "tube" ||
+    kind === "outlet" ||
+    kind === "funnel" ||
+    kind === "fan"
+  ) {
     return <SpecialIcon kind={kind} rotation={rotation} />;
   }
   if (kind === "seesaw") {
@@ -115,7 +120,7 @@ function SpecialIcon({
   kind,
   rotation,
 }: {
-  kind: "tube" | "outlet" | "fan";
+  kind: "tube" | "outlet" | "funnel" | "fan";
   rotation: number;
 }) {
   // Which way the spout or intake points on screen: right for +x and -y
@@ -153,6 +158,20 @@ function SpecialIcon({
             fill="none"
           />
           <circle cx={right ? 30 : 10} cy="17" r="3" fill="#2a1d14" />
+        </>
+      ) : kind === "funnel" ? (
+        <>
+          <path d="M5 5 L35 5 L27 18 L13 18 Z" {...glass} />
+          <rect x="13" y="17" width="14" height="19" rx="2" {...glass} />
+          <rect x="4" y="3" width="32" height="3" rx="1" fill="#c99c66" />
+          <rect x="11" y="33" width="18" height="3" rx="1" fill="#c99c66" />
+          <circle cx="13" cy="9" r="4" fill="#4f9fd1" />
+          <path
+            d="M20 22 L20 29 M17 26 L20 29 L23 26"
+            stroke="#7dd3fc"
+            strokeWidth="1.5"
+            fill="none"
+          />
         </>
       ) : (
         <>
