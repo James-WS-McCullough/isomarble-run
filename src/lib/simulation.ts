@@ -23,8 +23,31 @@ import {
 } from "./space";
 import { type Piece, REST_HEIGHTS, restHeight, TrackIndex } from "./track";
 
-/** A marble inside a column of tubes */
-interface TubeState {
+/**
+ * What a marble is doing. It's always exactly one of these, and each carries
+ * what that kind of movement needs.
+ */
+export type Motion = Flying | Rolling | InTube | Held;
+
+/** Flying through the air, moving with its velocity */
+export interface Flying {
+  mode: "flying";
+}
+
+/** Rolling along a path across a piece */
+export interface Rolling {
+  mode: "rolling";
+  piece: Piece;
+  path: Path;
+  distance: number;
+  exit: Direction;
+  /** Side it rolled in from, or null if it landed on the piece */
+  entry: Direction | null;
+}
+
+/** Inside a column of tubes, moving up or down it */
+export interface InTube {
+  mode: "tube";
   /** The column it's in */
   x: number;
   y: number;
@@ -37,6 +60,25 @@ interface TubeState {
    * back up, so it reaches the outlets below where it came in
    */
   sinking: boolean;
+}
+
+/** Waiting in a seesaw's cup */
+export interface Held {
+  mode: "held";
+  piece: Piece;
+  /** Which end of the seesaw (±1) */
+  side: number;
+}
+
+const FLYING: Flying = { mode: "flying" };
+
+/** A marble's motion if it's in the given mode, or null */
+export function motionAs<M extends Motion["mode"]>(
+  marble: Marble,
+  mode: M,
+): Extract<Motion, { mode: M }> | null {
+  const { motion } = marble;
+  return motion.mode === mode ? (motion as Extract<Motion, { mode: M }>) : null;
 }
 
 /**
@@ -96,21 +138,9 @@ export interface Marble {
   /** Colour (0-360), painted onto pieces the marble rolls over */
   hue: number;
   position: Vec3;
-  /** Velocity while in the air */
+  motion: Motion;
+  /** Velocity while flying (only its upward part counts inside a tube) */
   velocity: Vec3;
-  /** Set while rolling along a piece */
-  rolling: {
-    piece: Piece;
-    path: Path;
-    distance: number;
-    exit: Direction;
-    /** Side it rolled in from, or null if it landed on the piece */
-    entry: Direction | null;
-  } | null;
-  /** Set while inside a glass tube */
-  tube: TubeState | null;
-  /** Set while waiting in a seesaw's cup: the seesaw and which end (±1) */
-  held: { piece: Piece; side: number } | null;
   /** Speed along the track while rolling */
   speed: number;
   /** Visible offset left over from a snap, eased away to hide the jump */
@@ -176,31 +206,25 @@ export class Simulation {
     for (const [id, seesaw] of this.seesaws) {
       if (byId.get(id)?.kind !== "seesaw") {
         this.seesaws.delete(id);
-        if (seesaw.held) seesaw.held.held = null;
+        if (seesaw.held) seesaw.held.motion = FLYING;
       }
     }
     for (const marble of this.marbles) {
-      if (marble.held) {
-        const piece = byId.get(marble.held.piece.id);
-        if (piece && samePlacement(piece, marble.held.piece)) {
-          marble.held.piece = piece;
+      const { motion } = marble;
+      if (motion.mode === "rolling" || motion.mode === "held") {
+        const piece = byId.get(motion.piece.id);
+        if (piece && samePlacement(piece, motion.piece)) {
+          motion.piece = piece;
+        } else if (motion.mode === "rolling") {
+          this.launch(marble, motion.exit);
         } else {
-          marble.held = null;
+          marble.motion = FLYING;
         }
-      }
-      if (
-        marble.tube &&
-        this.tubeCell(marble.tube, marble.position.z) === null
+      } else if (
+        motion.mode === "tube" &&
+        this.tubeCell(motion, marble.position.z) === null
       ) {
-        marble.tube = null;
-      }
-      const rolling = marble.rolling;
-      if (!rolling) continue;
-      const piece = byId.get(rolling.piece.id);
-      if (piece && samePlacement(piece, rolling.piece)) {
-        rolling.piece = piece;
-      } else {
-        this.launch(marble, rolling.exit);
+        marble.motion = FLYING;
       }
     }
   }
@@ -216,10 +240,8 @@ export class Simulation {
       id: `marble-${marbleCounter}`,
       hue: Math.floor(this.random() * 360),
       position: fromScreen(right, up, this.bounds.frontDepth),
+      motion: FLYING,
       velocity: { x: 0, y: 0, z: 0 },
-      rolling: null,
-      tube: null,
-      held: null,
       speed: 0,
       visualOffset: { x: 0, y: 0, z: 0 },
       rolled: { x: 0, y: 0 },
@@ -255,12 +277,13 @@ export class Simulation {
     const kept: Marble[] = [];
 
     for (const marble of this.marbles) {
-      if (marble.rolling) {
+      const { motion } = marble;
+      if (motion.mode === "rolling") {
         this.stepRolling(marble, dt, events);
-      } else if (marble.tube) {
-        this.stepInTube(marble, dt, events);
-      } else if (marble.held) {
-        this.stepHeld(marble);
+      } else if (motion.mode === "tube") {
+        this.stepInTube(marble, motion, dt, events);
+      } else if (motion.mode === "held") {
+        this.stepHeld(marble, motion);
       } else if (!this.stepFlying(marble, dt, events)) {
         events.push({ type: "removed", marbleId: marble.id });
         continue;
@@ -325,8 +348,8 @@ export class Simulation {
 
   /** Both rolling on the same piece, or on pieces that visibly join */
   private onJoinedTrack(a: Marble, b: Marble): boolean {
-    const ra = a.rolling;
-    const rb = b.rolling;
+    const ra = motionAs(a, "rolling");
+    const rb = motionAs(b, "rolling");
     if (!ra || !rb) return false;
     return (
       ra.piece === rb.piece ||
@@ -336,11 +359,17 @@ export class Simulation {
   }
 
   private velocityOf(marble: Marble): Vec3 {
-    const rolling = marble.rolling;
-    if (marble.tube) return { x: 0, y: 0, z: marble.velocity.z };
-    if (marble.held) return { x: 0, y: 0, z: 0 };
-    if (!rolling) return marble.velocity;
-    return scale(rolling.path.tangentAt(rolling.distance), marble.speed);
+    const { motion } = marble;
+    switch (motion.mode) {
+      case "flying":
+        return marble.velocity;
+      case "rolling":
+        return scale(motion.path.tangentAt(motion.distance), marble.speed);
+      case "tube":
+        return { x: 0, y: 0, z: marble.velocity.z };
+      case "held":
+        return { x: 0, y: 0, z: 0 };
+    }
   }
 
   /**
@@ -348,36 +377,39 @@ export class Simulation {
    * its groove, turning round if that points backwards.
    */
   private setVelocity(marble: Marble, velocity: Vec3) {
-    const rolling = marble.rolling;
-    // A marble sitting in a seesaw cup stays put
-    if (marble.held) return;
-    if (marble.tube) {
-      // Tubes only let marbles move up and down
-      marble.velocity = { x: 0, y: 0, z: velocity.z };
-      return;
-    }
-    if (!rolling) {
-      marble.velocity = velocity;
-      return;
-    }
-    const along = dot(velocity, rolling.path.tangentAt(rolling.distance));
-    if (along >= 0) {
-      marble.speed = along;
-    } else {
-      this.turnAround(marble);
-      marble.speed = -along;
+    const { motion } = marble;
+    switch (motion.mode) {
+      case "flying":
+        marble.velocity = velocity;
+        return;
+      case "rolling": {
+        const along = dot(velocity, motion.path.tangentAt(motion.distance));
+        if (along >= 0) {
+          marble.speed = along;
+        } else {
+          this.turnAround(marble, motion);
+          marble.speed = -along;
+        }
+        return;
+      }
+      case "tube":
+        // Tubes only let marbles move up and down
+        marble.velocity = { x: 0, y: 0, z: velocity.z };
+        return;
+      case "held":
+        // A marble sitting in a seesaw cup stays put
+        return;
     }
   }
 
   /** Roll back the way it came */
-  private turnAround(marble: Marble) {
-    const rolling = marble.rolling;
-    if (!rolling) return;
+  private turnAround(marble: Marble, rolling: Rolling) {
     const { piece } = rolling;
 
     if (rolling.entry) {
       const path = new Path(rolling.path.backFrom(rolling.distance));
-      marble.rolling = {
+      marble.motion = {
+        mode: "rolling",
         piece,
         path,
         distance: 0,
@@ -401,7 +433,14 @@ export class Simulation {
         { x: v.x / 2, y: v.y / 2 },
       ]),
     );
-    marble.rolling = { piece, path, distance: 0, exit, entry: null };
+    marble.motion = {
+      mode: "rolling",
+      piece,
+      path,
+      distance: 0,
+      exit,
+      entry: null,
+    };
   }
 
   private stepRolling(marble: Marble, dt: number, events: SimulationEvent[]) {
@@ -419,8 +458,9 @@ export class Simulation {
 
     let travel = marble.speed * dt;
     // A marble can cross a few short paths in one step
-    for (let hops = 0; hops < 4 && marble.rolling; hops++) {
-      const rolling = marble.rolling;
+    for (let hops = 0; hops < 4; hops++) {
+      const rolling = motionAs(marble, "rolling");
+      if (!rolling) return;
       const remaining = rolling.path.length - rolling.distance;
       if (travel < remaining) {
         rolling.distance += travel;
@@ -712,7 +752,7 @@ export class Simulation {
       const waiting = state.held;
       state.down = side;
       if (waiting) {
-        waiting.held = null;
+        waiting.motion = FLYING;
         const out = -side;
         waiting.velocity = {
           x: axis.x * out * SEESAW.LAUNCH_OUT,
@@ -726,20 +766,16 @@ export class Simulation {
     }
 
     state.held = marble;
-    marble.held = { piece, side };
+    marble.motion = { mode: "held", piece, side };
     marble.velocity = { x: 0, y: 0, z: 0 };
-    marble.rolling = null;
-    marble.tube = null;
     this.snapTo(marble, cupPosition(piece, side, state.tilt));
   }
 
   /** Ride along in a seesaw cup as it tips */
-  private stepHeld(marble: Marble) {
-    const held = marble.held;
-    if (!held) return;
+  private stepHeld(marble: Marble, held: Held) {
     const state = this.seesawState(held.piece);
     if (state.held !== marble) {
-      marble.held = null;
+      marble.motion = FLYING;
       return;
     }
     marble.position = cupPosition(held.piece, held.side, state.tilt);
@@ -790,14 +826,20 @@ export class Simulation {
     const v = marble.velocity;
     const spin = offset.x * v.y - offset.y * v.x < 0 ? -1 : 1;
 
-    marble.rolling = null;
-    marble.tube = { x, y, offset, spin, sinking: verticalSpeed < 0 };
+    marble.motion = {
+      mode: "tube",
+      x,
+      y,
+      offset,
+      spin,
+      sinking: verticalSpeed < 0,
+    };
     marble.velocity = { x: 0, y: 0, z: verticalSpeed };
     this.snapTo(marble, { x: x + offset.x, y: y + offset.y, z });
   }
 
   /** Circle round a funnel, closing in on the middle as the marble drops */
-  private swirl(tube: TubeState, cell: number, z: number, dt: number) {
+  private swirl(tube: InTube, cell: number, z: number, dt: number) {
     const piece = this.track.pieceAt({ x: tube.x, y: tube.y, z: cell });
     let room = 0;
     if (piece?.kind === "funnel") {
@@ -825,13 +867,16 @@ export class Simulation {
    * Move up or down a column of tubes: falling, or blown up by a fan at the
    * bottom. Marbles blown up to an outlet leave through its spout.
    */
-  private stepInTube(marble: Marble, dt: number, events: SimulationEvent[]) {
-    const column = marble.tube;
-    if (!column) return;
+  private stepInTube(
+    marble: Marble,
+    column: InTube,
+    dt: number,
+    events: SimulationEvent[],
+  ) {
     const z = marble.position.z;
     const cell = this.tubeCell(column, z);
     if (cell === null) {
-      marble.tube = null;
+      marble.motion = FLYING;
       return;
     }
 
@@ -889,14 +934,13 @@ export class Simulation {
         this.track.pieceAt({ x: column.x, y: column.y, z: top })?.kind ===
         "outlet";
       if (!capped && after > top + 0.5) {
-        marble.tube = null;
+        marble.motion = FLYING;
         marble.headingForward = true;
       }
     } else if (base && !blown) {
       // Dropping out of the bottom onto the piece below
       const landing = bottom - 1 + restHeight(base.kind);
       if (after <= landing) {
-        marble.tube = null;
         this.land(
           marble,
           { piece: base, point: { x: column.x, y: column.y, z: landing } },
@@ -915,7 +959,7 @@ export class Simulation {
       }
     } else if (after < bottom - 0.5) {
       // Out of the bottom into thin air
-      marble.tube = null;
+      marble.motion = FLYING;
       marble.headingForward = false;
     }
 
@@ -967,7 +1011,7 @@ export class Simulation {
     const v = marble.velocity;
     const sideways = Math.hypot(v.x, v.y);
     const hop = sideways < PHYSICS.DROP_SPEED ? 1 : PHYSICS.FAN_HOP / sideways;
-    marble.rolling = null;
+    marble.motion = FLYING;
     marble.velocity = { x: v.x * hop, y: v.y * hop, z: PHYSICS.FAN_KICK };
     marble.headingForward = v.x + v.y > 0;
     this.snapTo(marble, from);
@@ -1007,11 +1051,17 @@ export class Simulation {
       { x: 0, y: 0 },
       { x: v.x / 2, y: v.y / 2 },
     ]);
-    marble.tube = null;
     marble.velocity = { x: 0, y: 0, z: 0 };
     marble.speed = Math.max(PHYSICS.CRUISE_SPEED, verticalSpeed * 0.8);
     this.snapTo(marble, path.points[0]);
-    marble.rolling = { piece: outlet, path, distance: 0, exit, entry: null };
+    marble.motion = {
+      mode: "rolling",
+      piece: outlet,
+      path,
+      distance: 0,
+      exit,
+      entry: null,
+    };
     events.push({ type: "paint", pieceId: outlet.id, hue: marble.hue });
   }
 
@@ -1077,7 +1127,14 @@ export class Simulation {
     marble.velocity = { x: 0, y: 0, z: 0 };
     marble.position = point;
     this.snapTo(marble, path.points[0]);
-    marble.rolling = { piece, path, distance: 0, exit, entry: null };
+    marble.motion = {
+      mode: "rolling",
+      piece,
+      path,
+      distance: 0,
+      exit,
+      entry: null,
+    };
 
     events.push({ type: "land", marbleId: marble.id, impact: Math.abs(v.z) });
     events.push({ type: "paint", pieceId: piece.id, hue: marble.hue });
@@ -1106,7 +1163,7 @@ export class Simulation {
     if (piece.kind === "seesaw") {
       const v = DIRECTION_VECTORS[arriving];
       marble.velocity = { x: v.x * marble.speed, y: v.y * marble.speed, z: 0 };
-      marble.rolling = null;
+      marble.motion = FLYING;
       this.landOnSeesaw(marble, piece, events);
       return;
     }
@@ -1167,7 +1224,8 @@ export class Simulation {
       const edge = new Path([wall, wall]);
       marble.speed *= PHYSICS.BOUNCE_KEEP;
       this.snapTo(marble, edge.points[0]);
-      marble.rolling = {
+      marble.motion = {
+        mode: "rolling",
         piece,
         path: edge,
         distance: 0,
@@ -1187,7 +1245,14 @@ export class Simulation {
     if (entrySide === exit) marble.speed *= PHYSICS.BOUNCE_KEEP;
 
     this.snapTo(marble, path.points[0]);
-    marble.rolling = { piece, path, distance: 0, exit, entry: entrySide };
+    marble.motion = {
+      mode: "rolling",
+      piece,
+      path,
+      distance: 0,
+      exit,
+      entry: entrySide,
+    };
     events.push({ type: "paint", pieceId: piece.id, hue: marble.hue });
   }
 
@@ -1195,7 +1260,7 @@ export class Simulation {
   private launch(marble: Marble, direction: Direction) {
     const v = DIRECTION_VECTORS[direction];
     marble.velocity = { x: v.x * marble.speed, y: v.y * marble.speed, z: 0 };
-    marble.rolling = null;
+    marble.motion = FLYING;
 
     // Heading towards the camera, it can land on anything that looks below
     // it. Heading away, it drops behind pieces that are in front of it.

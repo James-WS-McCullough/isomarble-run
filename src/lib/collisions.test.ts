@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Simulation } from "./simulation";
+import { motionAs, Simulation } from "./simulation";
 import { createPiece, type Piece } from "./track";
 
 /** Random numbers from a list, then 0.5 forever */
@@ -23,17 +23,22 @@ describe("marble collisions", () => {
     const left = sim.addMarble({ x: -2, y: 0, z: 1.2 });
     const right = sim.addMarble({ x: 2, y: 0, z: 1.2 });
 
-    rollUntil(sim, () => left.rolling !== null && right.rolling !== null);
-    expect(left.rolling?.exit).toBe("+x");
-    expect(right.rolling?.exit).toBe("-x");
+    rollUntil(
+      sim,
+      () =>
+        motionAs(left, "rolling") !== null &&
+        motionAs(right, "rolling") !== null,
+    );
+    expect(motionAs(left, "rolling")?.exit).toBe("+x");
+    expect(motionAs(right, "rolling")?.exit).toBe("-x");
 
     for (let i = 0; i < 90; i++) {
       sim.advance(1 / 60);
       // They never pass through each other
       expect(left.position.x).toBeLessThan(right.position.x);
     }
-    expect(left.rolling?.exit).toBe("-x");
-    expect(right.rolling?.exit).toBe("+x");
+    expect(motionAs(left, "rolling")?.exit).toBe("-x");
+    expect(motionAs(right, "rolling")?.exit).toBe("+x");
   });
 
   it("passes speed on when a fast marble catches a slow one", () => {
@@ -41,7 +46,12 @@ describe("marble collisions", () => {
     sim.setPieces(row([-4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6]));
     const back = sim.addMarble({ x: -3, y: 0, z: 1.2 });
     const front = sim.addMarble({ x: -1, y: 0, z: 1.2 });
-    rollUntil(sim, () => back.rolling !== null && front.rolling !== null);
+    rollUntil(
+      sim,
+      () =>
+        motionAs(back, "rolling") !== null &&
+        motionAs(front, "rolling") !== null,
+    );
     back.speed = 7;
     front.speed = 2.5;
 
@@ -64,9 +74,14 @@ describe("marble collisions", () => {
     sim.setPieces(pieces);
     const left = sim.addMarble({ x: -1, y: 0, z: 1.2 });
     const right = sim.addMarble({ x: 3, y: 1, z: 2.2 });
-    rollUntil(sim, () => left.rolling !== null && right.rolling !== null);
-    expect(left.rolling?.exit).toBe("+x");
-    expect(right.rolling?.exit).toBe("-x");
+    rollUntil(
+      sim,
+      () =>
+        motionAs(left, "rolling") !== null &&
+        motionAs(right, "rolling") !== null,
+    );
+    expect(motionAs(left, "rolling")?.exit).toBe("+x");
+    expect(motionAs(right, "rolling")?.exit).toBe("-x");
 
     let hit = false;
     for (let i = 0; i < 120 && !hit; i++) {

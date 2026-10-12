@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Simulation, type SimulationEvent } from "./simulation";
+import { motionAs, Simulation, type SimulationEvent } from "./simulation";
 import { createPiece, type Piece } from "./track";
 
 function painted(events: SimulationEvent[], pieces: Piece[]): string[] {
@@ -32,7 +32,7 @@ describe("tubes and fans", () => {
     const events: SimulationEvent[] = [];
     for (let i = 0; i < 120; i++) {
       events.push(...sim.advance(1 / 60));
-      inTube ||= marble.tube !== null;
+      inTube ||= motionAs(marble, "tube") !== null;
     }
     expect(inTube).toBe(true);
     expect(painted(events, pieces)).toContain("straight@0,0,0");

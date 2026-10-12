@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { fitsAt } from "./placement";
-import { Simulation } from "./simulation";
+import { motionAs, Simulation } from "./simulation";
 import { createPiece, TrackIndex } from "./track";
 
 function settle(sim: Simulation, seconds = 1) {
@@ -17,7 +17,7 @@ describe("cup seesaw", () => {
     sim.setPieces([piece]);
     const marble = sim.addMarble({ x: 1, y: 0, z: 1.5 });
     settle(sim);
-    expect(marble.held?.side).toBe(1);
+    expect(motionAs(marble, "held")?.side).toBe(1);
     expect(sim.marbles).toContain(marble);
   });
 
@@ -35,8 +35,8 @@ describe("cup seesaw", () => {
       sim.advance(1 / 60);
       highest = Math.max(highest, waiting.position.z);
     }
-    expect(trigger.held?.side).toBe(-1);
-    expect(waiting.held).toBeNull();
+    expect(motionAs(trigger, "held")?.side).toBe(-1);
+    expect(motionAs(waiting, "held")).toBeNull();
     expect(highest).toBeGreaterThan(1.2);
     // It tipped the other way
     expect(Math.sign(sim.seesawTilt(piece.id))).toBe(-Math.sign(tilt));
@@ -50,8 +50,8 @@ describe("cup seesaw", () => {
     settle(sim);
     const second = sim.addMarble({ x: 1.05, y: 0, z: 2.5 });
     settle(sim, 0.6);
-    expect(first.held?.side).toBe(1);
-    expect(second.held).toBeNull();
+    expect(motionAs(first, "held")?.side).toBe(1);
+    expect(motionAs(second, "held")).toBeNull();
   });
 
   it("rolls off a track into the cup at the end", () => {
@@ -63,7 +63,7 @@ describe("cup seesaw", () => {
     sim.setPieces([piece, track]);
     const marble = sim.addMarble({ x: 2, y: 0, z: 1.5 });
     settle(sim, 3);
-    expect(marble.held?.piece).toBe(piece);
+    expect(motionAs(marble, "held")?.piece).toBe(piece);
   });
 
   it("takes up three tiles along its beam", () => {

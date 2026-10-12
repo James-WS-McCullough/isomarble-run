@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { pieceExits } from "./pieces";
 import {
+  motionAs,
   PHYSICS,
   Simulation,
   type SimulationEvent,
@@ -171,7 +172,8 @@ describe("Simulation", () => {
     let leftVia: string | null = null;
     for (let i = 0; i < 200 && !leftVia; i++) {
       sim.advance(1 / 60);
-      if (marble.rolling?.piece === catcher) leftVia = marble.rolling.exit;
+      const rolling = motionAs(marble, "rolling");
+      if (rolling?.piece === catcher) leftVia = rolling.exit;
     }
     expect(leftVia).toBe("+x");
   });
@@ -216,7 +218,8 @@ describe("Simulation", () => {
     const painted: string[] = [];
     for (let i = 0; i < 120; i++) {
       painted.push(...paintedIds(sim.advance(1 / 60)));
-      if (marble.rolling?.piece === start && marble.rolling.exit === "-x") {
+      const rolling = motionAs(marble, "rolling");
+      if (rolling?.piece === start && rolling.exit === "-x") {
         bouncedBack = true;
       }
     }
@@ -234,7 +237,8 @@ describe("Simulation", () => {
     let turned = false;
     for (let i = 0; i < 120 && !turned; i++) {
       sim.advance(1 / 60);
-      turned = marble.rolling?.piece === splitter && marble.rolling.path.turns;
+      const rolling = motionAs(marble, "rolling");
+      turned = rolling?.piece === splitter && rolling.path.turns;
     }
     expect(turned).toBe(true);
   });
@@ -285,10 +289,11 @@ describe("Simulation", () => {
     const sim = new Simulation(() => 0);
     sim.setPieces([piece]);
     const marble = sim.addMarble(above(piece.cell));
-    for (let i = 0; i < 120 && !marble.rolling; i++) sim.advance(1 / 60);
-    expect(marble.rolling).not.toBeNull();
+    for (let i = 0; i < 120 && !motionAs(marble, "rolling"); i++)
+      sim.advance(1 / 60);
+    expect(motionAs(marble, "rolling")).not.toBeNull();
 
     sim.setPieces([]);
-    expect(marble.rolling).toBeNull();
+    expect(motionAs(marble, "rolling")).toBeNull();
   });
 });

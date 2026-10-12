@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PieceKind } from "./pieces";
-import { Simulation, type SimulationEvent } from "./simulation";
+import { motionAs, Simulation, type SimulationEvent } from "./simulation";
 import type { Cell } from "./space";
 import { createPiece, type Piece } from "./track";
 
@@ -31,7 +31,7 @@ describe("funnels", () => {
     for (let i = 0; i < 180; i++) {
       events.push(...sim.advance(1 / 60));
       const { x, y } = marble.position;
-      if (marble.tube && Math.hypot(x, y) > 0.02) {
+      if (motionAs(marble, "tube") && Math.hypot(x, y) > 0.02) {
         const angle = Math.atan2(y, x);
         if (lastAngle !== null) {
           circled += Math.abs(
@@ -67,7 +67,8 @@ describe("funnels", () => {
     const events: SimulationEvent[] = [];
     for (let i = 0; i < 300; i++) {
       events.push(...sim.advance(1 / 60));
-      if (marble.tube) lowest = Math.min(lowest, marble.position.z);
+      if (motionAs(marble, "tube"))
+        lowest = Math.min(lowest, marble.position.z);
     }
     // Down past the outlet to the fan, then back up and out of the spout
     expect(lowest).toBeLessThan(1);
@@ -88,7 +89,7 @@ describe("funnels", () => {
     let inFunnel = false;
     for (let i = 0; i < 120; i++) {
       sim.advance(1 / 60);
-      inFunnel ||= marble.tube !== null;
+      inFunnel ||= motionAs(marble, "tube") !== null;
     }
     expect(inFunnel).toBe(true);
   });
@@ -142,7 +143,7 @@ describe("funnels", () => {
       const events: SimulationEvent[] = [];
       for (let i = 0; i < 240; i++) {
         events.push(...sim.advance(1 / 60));
-        inTube ||= marble.tube !== null;
+        inTube ||= motionAs(marble, "tube") !== null;
       }
       expect(inTube).toBe(true);
       expect(painted(events, pieces)).toContain(`straight@1,0,${3 + up}`);

@@ -59,7 +59,7 @@ export class SoundEngine {
 
     const rollingIds = new Set<string>();
     for (const marble of marbles) {
-      if (!marble.rolling) continue;
+      if (marble.motion.mode !== "rolling") continue;
       rollingIds.add(marble.id);
 
       let voice = this.voices.get(marble.id);
