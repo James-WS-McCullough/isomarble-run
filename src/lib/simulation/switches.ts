@@ -1,5 +1,6 @@
-import type { Direction } from "../directions";
+import { type Direction, rotateDirection } from "../directions";
 import type { Piece } from "../track";
+import type { Rolling } from "./marble";
 
 /**
  * The flip-flop switches on the track, and which branch each one's T sends
@@ -28,4 +29,16 @@ export class Switches {
       if (pieces.get(id)?.kind !== "flipflop") this.sides.delete(id);
     }
   }
+}
+
+/**
+ * Whether a marble rolling across a flip-flop is heading out down a branch
+ * (rather than up one into the stem), so it pushes the T over as it goes
+ */
+export function pushesFlipFlop(rolling: Rolling): boolean {
+  const { rotation } = rolling.piece;
+  const exit = rotateDirection(rolling.exit, -rotation);
+  const entry = rolling.entry && rotateDirection(rolling.entry, -rotation);
+  const fromBranch = entry === "-y" || entry === "+y";
+  return (exit === "-y" || exit === "+y") && !fromBranch;
 }

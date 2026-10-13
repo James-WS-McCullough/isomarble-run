@@ -18,7 +18,7 @@ import {
 } from "./marble";
 import { densify, pathOnPiece } from "./routes";
 import type { Seesaws } from "./seesaws";
-import type { Switches } from "./switches";
+import { pushesFlipFlop, type Switches } from "./switches";
 import { blowUp, enterTube } from "./tubes";
 import { enterVortex } from "./vortex";
 
@@ -187,14 +187,7 @@ export const BEHAVIOURS: Partial<Record<PieceKind, PieceBehaviour>> = {
     // Rolling out down a branch, it pushes the T's arm on that side and
     // rocks it over for the next marble
     leave(world, _marble, rolling, _events) {
-      const exit = rotateDirection(rolling.exit, -rolling.piece.rotation);
-      const entry =
-        rolling.entry &&
-        rotateDirection(rolling.entry, -rolling.piece.rotation);
-      const fromBranch = entry === "-y" || entry === "+y";
-      if ((exit === "-y" || exit === "+y") && !fromBranch) {
-        world.switches.flip(rolling.piece.id);
-      }
+      if (pushesFlipFlop(rolling)) world.switches.flip(rolling.piece.id);
       return false;
     },
   },

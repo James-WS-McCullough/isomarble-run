@@ -3,6 +3,8 @@
 import { useFrame } from "@react-three/fiber";
 import { useContext, useRef } from "react";
 import * as THREE from "three";
+import { motionAs } from "@/lib/simulation";
+import { pushesFlipFlop } from "@/lib/simulation/switches";
 import { GROOVE_DEPTH } from "@/lib/space";
 import { getPieceMaterial, OUTLINE_MATERIAL } from "./materials";
 import type { ModelProps } from "./PieceMesh";
@@ -19,8 +21,13 @@ import { SimulationContext } from "./SimulationContext";
  * when sending marbles down -y)
  */
 const TILT = 0.4;
-/** How fast the T rocks over (radians per second) */
-const SWING_SPEED = 6;
+/** How fast the T can rock (radians per second) */
+const SWING_SPEED = 12;
+/**
+ * How far along its way out (0 to 1) a marble is when it meets the T's
+ * arm, and when it has pushed it right over
+ */
+const PUSH = { FROM: 0.15, TO: 0.6 };
 
 const legGeometry = new THREE.BoxGeometry(0.3, 0.16, 0.045);
 legGeometry.translate(0.15, 0.08, 0);
@@ -51,7 +58,20 @@ export function FlipFlop({ pieceId, look, raycast }: ModelProps) {
     if (!flipper.current) return;
     const side = simulation && pieceId ? simulation.switchSide(pieceId) : "-y";
     // Sending marbles down -y, the leg leans towards +y, and the other way
-    const target = side === "+y" ? -TILT : TILT;
+    let target = side === "+y" ? -TILT : TILT;
+    // A marble on its way out down a branch pushes the T over as it passes
+    for (const marble of simulation?.marbles ?? []) {
+      const rolling = motionAs(marble, "rolling");
+      if (!rolling || rolling.piece.id !== pieceId) continue;
+      if (!pushesFlipFlop(rolling)) continue;
+      const progress = rolling.distance / rolling.path.length;
+      const t = Math.min(
+        1,
+        Math.max(0, (progress - PUSH.FROM) / (PUSH.TO - PUSH.FROM)),
+      );
+      target *= 1 - 2 * (t * t * (3 - 2 * t));
+      break;
+    }
     const step = SWING_SPEED * delta;
     angle.current += Math.max(-step, Math.min(step, target - angle.current));
     // Three.js turns +x towards -z, which is the piece's -y
