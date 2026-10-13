@@ -9,6 +9,7 @@ import {
   type Swirling,
   snapTo,
 } from "./marble";
+import { PHYSICS } from "./physics";
 
 /** How marbles move round a vortex */
 const SWIRL = {
@@ -22,7 +23,16 @@ const SWIRL = {
   MIN_AROUND: 2,
   /** Fastest a marble can go round */
   MAX_SPEED: 9,
+  /** How quickly the sides of the hole guide a dropping marble to the middle */
+  CENTRING: 20,
+  /** Fastest a marble dropping into the hole can turn (radians a second) */
+  MAX_TURN: 30,
 };
+
+/** How steep the cone is: how far it drops for each step in towards the hole */
+const CONE_SLOPE =
+  (VORTEX.RIM_HEIGHT - VORTEX.HOLE_HEIGHT) /
+  (VORTEX.RIM_RADIUS - VORTEX.HOLE_RADIUS);
 
 /** Furthest out a marble's centre can be, against the rim */
 const OUTERMOST = VORTEX.RIM_RADIUS - MARBLE_RADIUS;
@@ -58,6 +68,7 @@ export function enterVortex(
     angle,
     spin: sent * Math.max(r, 0.1),
     radialSpeed: outwards,
+    drop: null,
   };
   marble.velocity = { x: 0, y: 0, z: 0 };
   snapTo(marble, pointOn(vortex, r, angle));
@@ -70,6 +81,10 @@ export function enterVortex(
  * through the hole.
  */
 export function stepSwirling(marble: Marble, swirl: Swirling, dt: number) {
+  if (swirl.drop) {
+    stepDropping(marble, swirl, swirl.drop, dt);
+    return;
+  }
   swirl.spin *= Math.exp(-SWIRL.FRICTION * dt);
   const r = Math.max(swirl.r, 0.05);
   const around = Math.max(
@@ -89,17 +104,52 @@ export function stepSwirling(marble: Marble, swirl: Swirling, dt: number) {
     swirl.radialSpeed = Math.min(0, -swirl.radialSpeed * 0.3);
   }
 
-  const { piece } = swirl;
   if (swirl.r < VORTEX.HOLE_RADIUS) {
-    // Down through the hole, onto whatever's below
-    const { x, y, z } = piece.cell;
-    marble.motion = FLYING;
-    marble.velocity = { x: 0, y: 0, z: -1 };
-    marble.headingForward = false;
-    rollTo(marble, { x, y, z: z + VORTEX.HOLE_HEIGHT });
+    // Over the edge of the hole: it starts to drop, still going round,
+    // and as fast as it was coming down the cone
+    swirl.drop = {
+      z: marble.position.z,
+      speed: Math.max(0, -swirl.radialSpeed * CONE_SLOPE),
+    };
+    stepDropping(marble, swirl, swirl.drop, dt);
     return;
   }
-  rollTo(marble, pointOn(piece, swirl.r, swirl.angle));
+  rollTo(marble, pointOn(swirl.piece, swirl.r, swirl.angle));
+}
+
+/**
+ * Drop into the hole: falling, and still going round as the sides of the
+ * hole guide it in to the middle, until it falls out of the bottom onto
+ * whatever's below
+ */
+function stepDropping(
+  marble: Marble,
+  swirl: Swirling,
+  drop: { z: number; speed: number },
+  dt: number,
+) {
+  drop.speed = Math.min(PHYSICS.MAX_SPEED, drop.speed + PHYSICS.GRAVITY * dt);
+  drop.z -= drop.speed * dt;
+  swirl.r *= Math.exp(-SWIRL.CENTRING * dt);
+  const r = Math.max(swirl.r, 0.01);
+  const around = Math.min(SWIRL.MAX_SPEED, Math.abs(swirl.spin) / r);
+  swirl.angle +=
+    Math.sign(swirl.spin) * Math.min(SWIRL.MAX_TURN, around / r) * dt;
+
+  const { x, y, z } = swirl.piece.cell;
+  rollTo(marble, {
+    x: x + swirl.r * Math.cos(swirl.angle),
+    y: y + swirl.r * Math.sin(swirl.angle),
+    z: drop.z,
+  });
+
+  // Out of the hole: falling onto whatever's below, which it lands on from
+  // above, so it goes behind anything in front
+  if (drop.z < z + VORTEX.HOLE_HEIGHT - 0.05) {
+    marble.motion = FLYING;
+    marble.velocity = { x: 0, y: 0, z: -drop.speed };
+    marble.headingForward = false;
+  }
 }
 
 /** Where a marble sits on the cone */

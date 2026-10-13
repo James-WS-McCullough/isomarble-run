@@ -72,6 +72,11 @@ export interface Swirling {
   spin: number;
   /** How fast it moves in (-) or out (+) */
   radialSpeed: number;
+  /**
+   * Once it's reached the hole, dropping into it: its height and how fast
+   * it's falling. Null while it's still going round the cone.
+   */
+  drop: { z: number; speed: number } | null;
 }
 
 export const FLYING: Flying = { mode: "flying" };

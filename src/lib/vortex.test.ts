@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { motionAs, Simulation, type SimulationEvent } from "./simulation";
-import { visited } from "./testing";
+import { runUntil, visited } from "./testing";
 import { createPiece, TrackIndex } from "./track";
 
 describe("vortex", () => {
@@ -42,6 +42,36 @@ describe("vortex", () => {
       "vortex@0,0,1",
       "straight@0,0,0",
     ]);
+  });
+
+  it("drops a marble into the hole without jumping", () => {
+    const sim = new Simulation(() => 0.5);
+    sim.setPieces(layout());
+    const marble = sim.addMarble({ x: 1, y: 0.4, z: 2.4 });
+    runUntil(sim, () => motionAs(marble, "swirling") !== null);
+
+    // From going round the cone until it's out of the hole below
+    let steepest = 0;
+    let fastestIn = 0;
+    let before = marble.position;
+    runUntil(
+      sim,
+      () => {
+        const now = marble.position;
+        const rBefore = Math.hypot(before.x, before.y);
+        const rNow = Math.hypot(now.x, now.y);
+        steepest = Math.max(steepest, before.z - now.z);
+        fastestIn = Math.max(fastestIn, rBefore - rNow);
+        before = now;
+        return now.z < 0.5;
+      },
+      20,
+    );
+    expect(marble.position.z).toBeLessThan(0.5);
+    // Never more than a little further down, or in, from one frame to the
+    // next: it falls into the hole, rather than snapping to the middle
+    expect(steepest).toBeLessThan(0.1);
+    expect(fastestIn).toBeLessThan(0.1);
   });
 
   it("has marbles knock into each other as they go round", () => {
