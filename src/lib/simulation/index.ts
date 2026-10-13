@@ -34,6 +34,7 @@ import {
 import { PHYSICS } from "./physics";
 import { densify, overTheRim, pathOnPiece, pick } from "./routes";
 import { Seesaws } from "./seesaws";
+import { Switches } from "./switches";
 import { catchFromBelow, stepInTube, tubeCell } from "./tubes";
 import { clamp, scale } from "./vector";
 import { bounceOffWalls } from "./walls";
@@ -82,6 +83,7 @@ export class Simulation {
   private readonly random: () => number;
   private readonly seesaws: Seesaws;
   private readonly dispensers = new Dispensers();
+  private readonly switches = new Switches();
 
   constructor(random: () => number = Math.random) {
     this.random = random;
@@ -90,7 +92,11 @@ export class Simulation {
 
   /** What special pieces' behaviours can reach */
   private get world(): World {
-    return { track: this.track, seesaws: this.seesaws };
+    return {
+      track: this.track,
+      seesaws: this.seesaws,
+      switches: this.switches,
+    };
   }
 
   /** Replace the track. Marbles on pieces that changed fall off. */
@@ -101,6 +107,7 @@ export class Simulation {
     const byId = new Map(pieces.map((piece) => [piece.id, piece]));
     this.seesaws.keepOnly(byId);
     this.dispensers.keepOnly(pieces);
+    this.switches.keepOnly(byId);
     for (const marble of this.marbles) {
       const { motion } = marble;
       if (motion.mode === "rolling" || motion.mode === "held") {
@@ -155,6 +162,11 @@ export class Simulation {
   clearMarbles() {
     this.marbles = [];
     this.seesaws.clear();
+  }
+
+  /** Which branch a flip-flop sends the next marble down (its own -y or +y) */
+  switchSide(pieceId: string): Direction {
+    return this.switches.side(pieceId);
   }
 
   /** How far a seesaw is tipped (radians; positive lowers its +1 end) */
@@ -332,10 +344,7 @@ export class Simulation {
     const v = marble.velocity;
     const horizontal = Math.hypot(v.x, v.y);
     const arriving = directionOfVelocity(v.x, v.y, PHYSICS.DROP_SPEED);
-    const exit = pick(
-      pieceExits(piece.kind, piece.rotation, arriving),
-      this.random,
-    );
+    const exit = this.chooseExit(piece, arriving);
 
     // Settle from where it landed into the groove, then follow it out
     const local = {
@@ -416,10 +425,7 @@ export class Simulation {
       return;
     }
 
-    const exit = pick(
-      pieceExits(piece.kind, piece.rotation, arriving),
-      this.random,
-    );
+    const exit = this.chooseExit(piece, arriving);
     const route = throughSide
       ? overTheRim(piece, entrySide, exit)
       : routeBetween(entrySide, exit);
@@ -438,6 +444,19 @@ export class Simulation {
       entry: entrySide,
     };
     events.push({ type: "visit", pieceId: piece.id, marbleId: marble.id });
+  }
+
+  /** Which way a marble leaves a piece it lands or rolls on */
+  private chooseExit(piece: Piece, arriving: Direction | null): Direction {
+    const chosen = BEHAVIOURS[piece.kind]?.chooseExit?.(
+      this.world,
+      piece,
+      arriving,
+    );
+    return (
+      chosen ??
+      pick(pieceExits(piece.kind, piece.rotation, arriving), this.random)
+    );
   }
 
   /** Roll off the end of the track into the air */

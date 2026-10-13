@@ -2,6 +2,7 @@ import {
   DIRECTION_VECTORS,
   type Direction,
   oppositeDirection,
+  rotateDirection,
 } from "../directions";
 import { isUpsideDown, type PieceKind, piecePorts } from "../pieces";
 import type { Vec3 } from "../space";
@@ -14,12 +15,14 @@ import {
   type SimulationEvent,
 } from "./marble";
 import type { Seesaws } from "./seesaws";
+import type { Switches } from "./switches";
 import { blowUp, enterTube } from "./tubes";
 
 /** What a piece's behaviour can reach */
 export interface World {
   track: TrackIndex;
   seesaws: Seesaws;
+  switches: Switches;
 }
 
 /**
@@ -45,6 +48,15 @@ export interface PieceBehaviour {
     arriving: Direction,
     events: SimulationEvent[],
   ): boolean;
+  /**
+   * Which way a marble leaves, for a piece that decides for itself rather
+   * than picking from its exits at random. Undefined to pick as usual.
+   */
+  chooseExit?(
+    world: World,
+    piece: Piece,
+    arriving: Direction | null,
+  ): Direction | undefined;
 }
 
 /** Falling into the top of a tube, or anywhere on a funnel */
@@ -72,6 +84,16 @@ const intoTheTop: PieceBehaviour["land"] = (
 };
 
 export const BEHAVIOURS: Partial<Record<PieceKind, PieceBehaviour>> = {
+  // Down the stem, or dropped on: off down the branch the flipper points
+  // to, flipping it for the next marble
+  flipflop: {
+    chooseExit(world, piece, arriving) {
+      const local = arriving && rotateDirection(arriving, -piece.rotation);
+      if (local === "-y" || local === "+y") return undefined;
+      return rotateDirection(world.switches.take(piece.id), piece.rotation);
+    },
+  },
+
   // Rolling or dropping onto a hole: in it goes, never to be seen again
   hole: {
     land(_world, marble, landing, events) {

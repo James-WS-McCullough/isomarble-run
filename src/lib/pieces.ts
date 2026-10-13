@@ -27,7 +27,8 @@ export type PieceKind =
   | "fan"
   | "seesaw"
   | "dispenser"
-  | "hole";
+  | "hole"
+  | "flipflop";
 
 interface PieceDefinition {
   kind: PieceKind;
@@ -201,6 +202,23 @@ const PIECE_DEFINITIONS: PieceDefinition[] = [
     grooves: [],
     open: true,
     length: 3,
+  },
+  {
+    // Shaped like a splitter, with a flipper where the branches meet.
+    // Marbles coming down the stem go the way the flipper points and knock
+    // it over, so they take turns down each branch. Marbles coming up a
+    // branch join the stem.
+    kind: "flipflop",
+    label: "Flip-flop",
+    ports: ["+x", "-y", "+y"],
+    exits: (arriving) =>
+      arriving === "-y" || arriving === "+y" ? ["+x"] : ["-y", "+y"],
+    grooves: [
+      across("-y", "+y"),
+      fromCentre("+x"),
+      arcBetween("+x", "-y"),
+      arcBetween("+x", "+y"),
+    ],
   },
   {
     // A hopper full of marbles that lets one roll out of its side every

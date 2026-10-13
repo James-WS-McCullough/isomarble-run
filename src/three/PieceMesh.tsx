@@ -5,6 +5,7 @@ import type { PieceKind } from "@/lib/pieces";
 import { type Cell, toThree } from "@/lib/space";
 import { Dispenser } from "./DispenserMesh";
 import { Fan } from "./FanMesh";
+import { FlipFlop } from "./FlipFlopMesh";
 import {
   getPieceMaterial,
   OUTLINE_MATERIAL,
@@ -46,6 +47,7 @@ const MODELS: Partial<Record<PieceKind, ComponentType<ModelProps>>> = {
   fan: Fan,
   seesaw: Seesaw,
   dispenser: Dispenser,
+  flipflop: FlipFlop,
 };
 
 const ignoreRaycast = () => null;
