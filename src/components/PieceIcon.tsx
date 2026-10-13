@@ -27,6 +27,7 @@ const ICONS: Partial<Record<PieceKind, (props: IconProps) => JSX.Element>> = {
   outlet: TubeIcon,
   funnel: FunnelIcon,
   seesaw: SeesawIcon,
+  vortex: VortexIcon,
 };
 
 /** Extra details drawn over a piece's top face */
@@ -215,6 +216,30 @@ function FunnelIcon({ rotation }: IconProps) {
         strokeWidth="1.5"
         fill="none"
       />
+    </Icon>
+  );
+}
+
+/** The vortex from above: a wide cone with a spiral down to its hole */
+function VortexIcon() {
+  const spiral = Array.from({ length: 49 }, (_, i) => {
+    const t = i / 48;
+    const r = 0.46 - 0.38 * t;
+    const angle = t * Math.PI * 5;
+    return project(r * Math.cos(angle), r * Math.sin(angle));
+  }).join(" ");
+  return (
+    <Icon>
+      <polygon points={circle(0.5)} {...WOOD} strokeWidth="1.5" />
+      <polygon points={circle(0.33)} fill="#d4a774" />
+      <polyline
+        points={spiral}
+        fill="none"
+        stroke="#8b5e34"
+        strokeWidth="1.2"
+      />
+      <polygon points={circle(0.08)} fill="#2a1d14" />
+      <circle cx="13" cy="19" r="2.6" fill={MARBLE} />
     </Icon>
   );
 }

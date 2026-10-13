@@ -20,6 +20,7 @@ import { densify, pathOnPiece } from "./routes";
 import type { Seesaws } from "./seesaws";
 import type { Switches } from "./switches";
 import { blowUp, enterTube } from "./tubes";
+import { enterVortex } from "./vortex";
 
 /** What a piece's behaviour can reach */
 export interface World {
@@ -98,6 +99,20 @@ const intoTheTop: PieceBehaviour["land"] = (
 };
 
 export const BEHAVIOURS: Partial<Record<PieceKind, PieceBehaviour>> = {
+  // Landing on a vortex, or rolling in over its rim: round and round it goes
+  vortex: {
+    land(_world, marble, landing, events) {
+      const impact = Math.abs(marble.velocity.z) / 2;
+      events.push({ type: "land", marbleId: marble.id, impact });
+      enterVortex(marble, landing.piece, landing.point, events);
+    },
+    rollIn(_world, marble, piece, arriving, events) {
+      carryOn(marble, arriving);
+      enterVortex(marble, piece, marble.position, events);
+      return true;
+    },
+  },
+
   portal: {
     // Rolling in through one end: into the ring in the middle
     rollIn(world, marble, piece, arriving, events) {

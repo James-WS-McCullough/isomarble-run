@@ -8,7 +8,7 @@ import { add, subtract } from "./vector";
  * What a marble is doing. It's always exactly one of these, and each carries
  * what that kind of movement needs.
  */
-export type Motion = Flying | Rolling | InTube | Held | Vanishing;
+export type Motion = Flying | Rolling | InTube | Held | Vanishing | Swirling;
 
 /** Flying through the air, moving with its velocity */
 export interface Flying {
@@ -59,6 +59,19 @@ export interface Vanishing {
   y: number;
   /** Once it's below this, it's gone */
   bottom: number;
+}
+
+/** Circling round a vortex, spiralling in towards its hole */
+export interface Swirling {
+  mode: "swirling";
+  piece: Piece;
+  /** How far from the middle */
+  r: number;
+  angle: number;
+  /** How fast it goes round, times its distance from the middle (±) */
+  spin: number;
+  /** How fast it moves in (-) or out (+) */
+  radialSpeed: number;
 }
 
 export const FLYING: Flying = { mode: "flying" };

@@ -15,6 +15,7 @@ import { Portal } from "./PortalMesh";
 import { getPieceGeometry } from "./pieceGeometry";
 import { Seesaw } from "./SeesawMesh";
 import { GlassFunnel, GlassOutlet, GlassTube } from "./TubeMeshes";
+import { Vortex } from "./VortexMesh";
 
 interface PieceMeshProps {
   kind: PieceKind;
@@ -54,6 +55,7 @@ const MODELS: Partial<Record<PieceKind, ComponentType<ModelProps>>> = {
   dispenser: Dispenser,
   flipflop: FlipFlop,
   portal: Portal,
+  vortex: Vortex,
 };
 
 const ignoreRaycast = () => null;

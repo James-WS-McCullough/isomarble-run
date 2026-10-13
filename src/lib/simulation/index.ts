@@ -37,6 +37,7 @@ import { Seesaws } from "./seesaws";
 import { Switches } from "./switches";
 import { catchFromBelow, stepInTube, tubeCell } from "./tubes";
 import { clamp, scale } from "./vector";
+import { stepSwirling } from "./vortex";
 import { bounceOffWalls } from "./walls";
 
 export type {
@@ -110,7 +111,11 @@ export class Simulation {
     this.switches.keepOnly(byId);
     for (const marble of this.marbles) {
       const { motion } = marble;
-      if (motion.mode === "rolling" || motion.mode === "held") {
+      if (
+        motion.mode === "rolling" ||
+        motion.mode === "held" ||
+        motion.mode === "swirling"
+      ) {
         const piece = byId.get(motion.piece.id);
         if (piece && samePlacement(piece, motion.piece)) {
           motion.piece = piece;
@@ -198,6 +203,8 @@ export class Simulation {
         if (landing) this.land(marble, landing, events);
       } else if (motion.mode === "held") {
         this.seesaws.stepHeld(marble, motion);
+      } else if (motion.mode === "swirling") {
+        stepSwirling(marble, motion, dt);
       } else if (
         motion.mode === "vanishing"
           ? !stepVanishing(marble, motion, dt)

@@ -7,11 +7,13 @@ import {
 } from "./directions";
 import {
   isFlatTopped,
+  isSolid,
   isTube,
   isUpsideDown,
   joinsTubeAbove,
   type PieceKind,
   pieceLength,
+  pieceWidth,
   portLevel,
 } from "./pieces";
 import { type PortalLink, portalLinks } from "./portals";
@@ -49,18 +51,26 @@ export function createPiece(
 }
 
 /**
- * The cells a piece takes up: its own, and for a long piece (like a
- * seesaw's beam) the cells either side of it along its x axis
+ * The cells a piece takes up: its own, and for a long or wide piece (like a
+ * seesaw's beam, or a vortex) the cells around it along its x and y axes
  */
 export function footprint(
   piece: Pick<Piece, "kind" | "rotation" | "cell">,
 ): Cell[] {
   const { cell } = piece;
-  const reach = (pieceLength(piece.kind) - 1) / 2;
-  const v = DIRECTION_VECTORS[rotateDirection("+x", piece.rotation)];
+  const along = (pieceLength(piece.kind) - 1) / 2;
+  const across = (pieceWidth(piece.kind) - 1) / 2;
+  const u = DIRECTION_VECTORS[rotateDirection("+x", piece.rotation)];
+  const w = DIRECTION_VECTORS[rotateDirection("+y", piece.rotation)];
   const cells: Cell[] = [];
-  for (let i = -reach; i <= reach; i++) {
-    cells.push({ x: cell.x + v.x * i, y: cell.y + v.y * i, z: cell.z });
+  for (let i = -along; i <= along; i++) {
+    for (let j = -across; j <= across; j++) {
+      cells.push({
+        x: cell.x + u.x * i + w.x * j,
+        y: cell.y + u.y * i + w.y * j,
+        z: cell.z,
+      });
+    }
   }
   return cells;
 }
@@ -233,7 +243,11 @@ export class TrackIndex {
     return footprint(piece).some(({ x, y, z }) => {
       const above = this.byCell.get(cellKey({ x, y, z: z + 1 }));
       if (!above) return false;
-      return !isTube(above.kind) || joinsTubeAbove(piece.kind);
+      // Marbles drop out of the bottom of a tube onto the piece below,
+      // unless it's joined to the tube
+      if (isTube(above.kind)) return joinsTubeAbove(piece.kind);
+      // Open pieces, like a vortex with its hole, don't cover it either
+      return isSolid(above.kind);
     });
   }
 

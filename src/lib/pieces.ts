@@ -29,7 +29,8 @@ export type PieceKind =
   | "dispenser"
   | "hole"
   | "flipflop"
-  | "portal";
+  | "portal"
+  | "vortex";
 
 interface PieceDefinition {
   kind: PieceKind;
@@ -58,6 +59,8 @@ interface PieceDefinition {
   open?: boolean;
   /** How many tiles long it is along its x axis, centred on its own tile */
   length?: number;
+  /** How many tiles wide it is along its y axis, centred on its own tile */
+  width?: number;
   /**
    * How many ways R can turn it: the four directions, unless it's round
    * (fewer) or can also be flipped upside down (the upside-down turns come
@@ -233,6 +236,22 @@ const PIECE_DEFINITIONS: PieceDefinition[] = [
     grooves: [across("+x", "-x")],
   },
   {
+    // A wide wooden cone over 3 by 3 tiles with a hole in the middle.
+    // Marbles land on it or roll in over its rim, circle round and round,
+    // knocking into each other as they spiral in faster and faster, and
+    // drop through the hole onto whatever's below.
+    kind: "vortex",
+    label: "Vortex",
+    ports: ALL,
+    exits: ANY_WAY,
+    grooves: [],
+    open: true,
+    length: 3,
+    width: 3,
+    // It's round, so turning it changes nothing
+    orientations: 1,
+  },
+  {
     // A hopper full of marbles that lets one roll out of its side every
     // couple of seconds
     kind: "dispenser",
@@ -324,6 +343,11 @@ export function isSolid(kind: PieceKind): boolean {
 /** How many tiles long a piece is along its x axis */
 export function pieceLength(kind: PieceKind): number {
   return getPiece(kind).length ?? 1;
+}
+
+/** How many tiles wide a piece is along its y axis */
+export function pieceWidth(kind: PieceKind): number {
+  return getPiece(kind).width ?? 1;
 }
 
 /** How many ways R can turn a piece */

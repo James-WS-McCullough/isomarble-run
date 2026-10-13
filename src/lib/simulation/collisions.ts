@@ -4,6 +4,7 @@ import { type Marble, motionAs, type SimulationEvent } from "./marble";
 import { PHYSICS } from "./physics";
 import { turnAround } from "./routes";
 import { add, dot, length, scale, subtract } from "./vector";
+import { setSwirlingVelocity, swirlingVelocity } from "./vortex";
 
 /**
  * Marbles bump into each other. Two marbles collide when they visibly
@@ -69,6 +70,8 @@ function velocityOf(marble: Marble): Vec3 {
       return scale(motion.path.tangentAt(motion.distance), marble.speed);
     case "tube":
       return { x: 0, y: 0, z: marble.velocity.z };
+    case "swirling":
+      return swirlingVelocity(motion);
     case "held":
     case "vanishing":
       return { x: 0, y: 0, z: 0 };
@@ -98,6 +101,9 @@ function setVelocity(marble: Marble, velocity: Vec3, random: () => number) {
     case "tube":
       // Tubes only let marbles move up and down
       marble.velocity = { x: 0, y: 0, z: velocity.z };
+      return;
+    case "swirling":
+      setSwirlingVelocity(motion, velocity);
       return;
     case "held":
     case "vanishing":
