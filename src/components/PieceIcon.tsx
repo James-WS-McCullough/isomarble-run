@@ -36,6 +36,7 @@ const DETAILS: Partial<
   fan: FanDetails,
   dispenser: DispenserDetails,
   flipflop: FlipFlopDetails,
+  portal: PortalDetails,
 };
 
 /**
@@ -120,6 +121,20 @@ function DispenserDetails({ rotation }: { rotation: number }) {
       <circle cx={cx + 1} cy={cy - 2} r="2.6" fill={MARBLE} />
       <circle cx={cx + 0.5} cy={cy + 3} r="2.6" fill="#f2c94c" />
     </>
+  );
+}
+
+/** The portal's ring, standing across the track */
+function PortalDetails({ rotation }: { rotation: number }) {
+  const a = rotatePoint({ x: 0, y: -0.34 }, rotation);
+  const b = rotatePoint({ x: 0, y: 0.34 }, rotation);
+  return (
+    <polyline
+      points={[project(a.x, a.y), project(b.x, b.y)].join(" ")}
+      stroke="#c084fc"
+      strokeWidth="4"
+      strokeLinecap="round"
+    />
   );
 }
 

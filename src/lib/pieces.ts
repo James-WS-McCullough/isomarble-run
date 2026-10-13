@@ -28,7 +28,8 @@ export type PieceKind =
   | "seesaw"
   | "dispenser"
   | "hole"
-  | "flipflop";
+  | "flipflop"
+  | "portal";
 
 interface PieceDefinition {
   kind: PieceKind;
@@ -219,6 +220,17 @@ const PIECE_DEFINITIONS: PieceDefinition[] = [
       arcBetween("+x", "-y"),
       arcBetween("+x", "+y"),
     ],
+  },
+  {
+    // A straight track through a glowing ring. Portals link up in pairs in
+    // the order they're placed: a marble rolling into one ring comes out of
+    // its twin's, heading the same way relative to the twin.
+    kind: "portal",
+    label: "Portal",
+    ports: ["+x", "-x"],
+    exits: (arriving) =>
+      arriving === "+x" || arriving === "-x" ? [arriving] : ["+x", "-x"],
+    grooves: [across("+x", "-x")],
   },
   {
     // A hopper full of marbles that lets one roll out of its side every

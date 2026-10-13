@@ -17,7 +17,7 @@ Build with the **hotbar** along the bottom, Minecraft style: press **1–9** to 
 | ✋ Move | Drag a piece somewhere else. **R** turns the piece under the pointer. |
 | 🧽 Erase | Remove a piece. |
 
-Pieces: Straight, Curve, Splitter, Crossing, Catcher, Block, Tube, Outlet, Funnel, Fan, Seesaw, Flip-flop, Dispenser and Hole.
+Pieces: Straight, Curve, Splitter, Crossing, Catcher, Block, Tube, Outlet, Funnel, Fan, Seesaw, Flip-flop, Portal, Dispenser and Hole.
 
 - **🧪 Tube**: a vertical glass pipe. Marbles that fall in the top drop down inside it and land on whatever is below.
 - **↪️ Outlet**: a tube with a spout. Marbles blown up to it shoot out of the spout onto the track; marbles rolling into the spout drop down the tube. Keep pressing **R** to turn it upside down: then the spout is at the bottom, and marbles dropping down the pipe come out onto the track one level down.
@@ -25,6 +25,7 @@ Pieces: Straight, Curve, Splitter, Crossing, Catcher, Block, Tube, Outlet, Funne
 - **🌀 Fan**: a crossroads with a fan set into the middle, so marbles can roll onto it from any side, and wisps of air show where it blows. It works as a jump pad. Marbles that roll or drop onto it get blown about two tiles up. If they rise into the bottom of a tube (or an upside-down funnel) on the way, the fan sucks them up the whole column like a vacuum, out of the first outlet or the open top. Marbles dropped into a column above a fan sink to the bottom first, then get blown back up.
 - **⚖️ Seesaw**: three tiles long, with a stand in the middle and a cup over each end. A marble waits in the low cup; when another lands (or rolls) into the high cup, it tips over and flings the waiting marble into the air, and the new one waits in its place, ready to go again.
 - **🔀 Flip-flop**: shaped like a splitter, with a wooden flipper where the branches meet. Marbles coming down the stem go the way the flipper points and knock it over, so they take turns down each branch. Marbles coming up a branch join the stem.
+- **🌀 Portal**: a track through a glowing ring. Portals pair up in the order you place them (first with second, third with fourth...), and each pair glows its own colour. A marble rolling into one ring comes out of its twin's, heading the same way relative to the twin, so turning a portal changes where marbles go. A portal on its own glows grey and is just a track.
 - **🫙 Dispenser**: a hopper full of marbles that lets one roll out of its side every two seconds, so a run keeps itself going. It waits while there are already lots of marbles about.
 - **🕳️ Hole**: a crossroads with a deep hole in the middle. Marbles that roll or drop onto it fall in and are gone: a good end for a dispenser's run.
 
@@ -114,6 +115,7 @@ src/
     track.ts              Placed pieces and fast lookups by on-screen position
     pieces.ts             Every kind of piece: its shape, openings and rules
     hotbar.ts             What can go in the hotbar, and its default layout
+    portals.ts            Which portals are paired with which
     centrelines.ts        Building blocks for the grooves carved into pieces
     grooves.ts            The carved surface, shared by the 3D models and the physics
     paths.ts              Routes across the top of a piece
@@ -139,6 +141,7 @@ src/
     FanMesh.tsx           The fan set into its crossroads
     DispenserMesh.tsx     The dispenser's hopper of marbles
     FlipFlopMesh.tsx      The flip-flop's flipper, swinging to follow the switch
+    PortalMesh.tsx        A portal's glowing ring, in its pair's colour
     SeesawMesh.tsx        The cup seesaw, tipping with the simulation
     AirParticles.tsx      Air rising from fans and through the tubes they blow
     materials.ts          Stained wood and marble materials

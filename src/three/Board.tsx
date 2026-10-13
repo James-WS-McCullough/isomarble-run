@@ -7,8 +7,9 @@ import {
   useFrame,
   useThree,
 } from "@react-three/fiber";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import type { PieceKind } from "@/lib/pieces";
+import { portalLinks } from "@/lib/portals";
 import type { Simulation, SimulationEvent } from "@/lib/simulation";
 import type { Cell } from "@/lib/space";
 import { footprint, type Piece } from "@/lib/track";
@@ -53,6 +54,9 @@ interface BoardProps {
  */
 export function Board(props: BoardProps) {
   const { pieces, onTargetChange } = props;
+
+  // Portals glow in their pairs' colours
+  const portals = useMemo(() => portalLinks(pieces), [pieces]);
 
   const toTarget = (event: ThreeEvent<PointerEvent | MouseEvent>) => {
     event.stopPropagation();
@@ -105,6 +109,7 @@ export function Board(props: BoardProps) {
               rotation={piece.rotation}
               cell={piece.cell}
               look={piece.id === props.highlightedId ? "highlight" : "normal"}
+              pair={portals.get(piece.id)?.pair ?? null}
               pickable={piece.id !== props.draggingId}
             />
           ))}

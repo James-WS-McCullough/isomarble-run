@@ -273,6 +273,10 @@ export class Simulation {
       rolling.distance = rolling.path.length;
       rollTo(marble, rolling.path.pointAt(rolling.distance));
 
+      // Some pieces send marbles on themselves, like a portal to its twin
+      const leave = BEHAVIOURS[rolling.piece.kind]?.leave;
+      if (leave?.(this.world, marble, rolling, events)) continue;
+
       const next = this.track.findConnection(rolling.piece, rolling.exit);
       if (next) {
         this.enterPiece(

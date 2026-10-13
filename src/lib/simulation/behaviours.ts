@@ -12,8 +12,11 @@ import {
   FLYING,
   type Landing,
   type Marble,
+  type Rolling,
   type SimulationEvent,
+  snapTo,
 } from "./marble";
+import { densify, pathOnPiece } from "./routes";
 import type { Seesaws } from "./seesaws";
 import type { Switches } from "./switches";
 import { blowUp, enterTube } from "./tubes";
@@ -46,6 +49,17 @@ export interface PieceBehaviour {
     marble: Marble,
     piece: Piece,
     arriving: Direction,
+    events: SimulationEvent[],
+  ): boolean;
+  /**
+   * A marble reaches the end of its path across the piece. Return true if
+   * the piece sent it on somewhere itself; false to roll on to the next
+   * piece as usual.
+   */
+  leave?(
+    world: World,
+    marble: Marble,
+    rolling: Rolling,
     events: SimulationEvent[],
   ): boolean;
   /**
@@ -84,6 +98,69 @@ const intoTheTop: PieceBehaviour["land"] = (
 };
 
 export const BEHAVIOURS: Partial<Record<PieceKind, PieceBehaviour>> = {
+  portal: {
+    // Rolling in through one end: into the ring in the middle
+    rollIn(world, marble, piece, arriving, events) {
+      const entrySide = oppositeDirection(arriving);
+      if (!world.track.twinOf(piece)) return false;
+      if (!piecePorts(piece.kind, piece.rotation).includes(entrySide)) {
+        return false;
+      }
+      const v = DIRECTION_VECTORS[entrySide];
+      const path = pathOnPiece(
+        piece,
+        densify([
+          { x: v.x / 2, y: v.y / 2 },
+          { x: 0, y: 0 },
+        ]),
+      );
+      snapTo(marble, path.points[0]);
+      marble.motion = {
+        mode: "rolling",
+        piece,
+        path,
+        distance: 0,
+        exit: arriving,
+        entry: entrySide,
+      };
+      events.push({ type: "visit", pieceId: piece.id, marbleId: marble.id });
+      return true;
+    },
+    // Reaching the ring: out of the twin's ring, heading the same way
+    // relative to the twin
+    leave(world, marble, rolling, events) {
+      const { piece } = rolling;
+      const end = rolling.path.pointAt(rolling.path.length);
+      const atRing =
+        Math.hypot(end.x - piece.cell.x, end.y - piece.cell.y) < 0.01;
+      const twin = world.track.twinOf(piece);
+      if (!atRing || !twin) return false;
+
+      const heading = rotateDirection(rolling.exit, -piece.rotation);
+      const exit = rotateDirection(heading, twin.rotation);
+      const v = DIRECTION_VECTORS[exit];
+      const path = pathOnPiece(
+        twin,
+        densify([
+          { x: 0, y: 0 },
+          { x: v.x / 2, y: v.y / 2 },
+        ]),
+      );
+      // Straight there, with no easing across the screen
+      marble.position = path.points[0];
+      marble.motion = {
+        mode: "rolling",
+        piece: twin,
+        path,
+        distance: 0,
+        exit,
+        entry: oppositeDirection(exit),
+      };
+      events.push({ type: "visit", pieceId: twin.id, marbleId: marble.id });
+      return true;
+    },
+  },
+
   // Down the stem, or dropped on: off down the branch the flipper points
   // to, flipping it for the next marble
   flipflop: {

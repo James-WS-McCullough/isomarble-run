@@ -14,6 +14,7 @@ import {
   pieceLength,
   portLevel,
 } from "./pieces";
+import { type PortalLink, portalLinks } from "./portals";
 import {
   type Cell,
   cellKey,
@@ -113,9 +114,11 @@ export class TrackIndex {
   private readonly ports = new Map<string, Piece[]>();
   /** Uncovered pieces by the on-screen column of their top face */
   private readonly columns = new Map<string, Piece[]>();
+  private readonly portals: Map<string, PortalLink>;
 
   constructor(pieces: Piece[]) {
     this.pieces = pieces;
+    this.portals = portalLinks(pieces);
     for (const piece of pieces) {
       for (const cell of footprint(piece))
         this.byCell.set(cellKey(cell), piece);
@@ -150,6 +153,11 @@ export class TrackIndex {
         );
       }
     }
+  }
+
+  /** The portal a portal leads to, if it has a twin */
+  twinOf(portal: Piece): Piece | undefined {
+    return this.portals.get(portal.id)?.twin;
   }
 
   pieceAt(cell: Cell): Piece | undefined {

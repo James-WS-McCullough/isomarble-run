@@ -11,6 +11,7 @@ import {
   OUTLINE_MATERIAL,
   type PieceLook,
 } from "./materials";
+import { Portal } from "./PortalMesh";
 import { getPieceGeometry } from "./pieceGeometry";
 import { Seesaw } from "./SeesawMesh";
 import { GlassFunnel, GlassOutlet, GlassTube } from "./TubeMeshes";
@@ -20,6 +21,8 @@ interface PieceMeshProps {
   rotation: number;
   cell: Cell;
   look?: PieceLook;
+  /** For linked pieces, like portals: which pair it's in (null if alone) */
+  pair?: number | null;
   /** Piece id, so pointer events can tell which piece was hit */
   pieceId?: string;
   /** Whether the pointer can hit this piece */
@@ -33,6 +36,8 @@ export interface ModelProps {
   /** Quarter turns: the model is already turned, but some flip too */
   rotation: number;
   look: PieceLook;
+  /** For linked pieces, like portals: which pair it's in (null if alone) */
+  pair?: number | null;
   raycast?: () => null;
 }
 
@@ -48,6 +53,7 @@ const MODELS: Partial<Record<PieceKind, ComponentType<ModelProps>>> = {
   seesaw: Seesaw,
   dispenser: Dispenser,
   flipflop: FlipFlop,
+  portal: Portal,
 };
 
 const ignoreRaycast = () => null;
@@ -57,6 +63,7 @@ export function PieceMesh({
   rotation,
   cell,
   look = "normal",
+  pair,
   pieceId,
   pickable = true,
 }: PieceMeshProps) {
@@ -75,6 +82,7 @@ export function PieceMesh({
           pieceId={pieceId}
           rotation={rotation}
           look={look}
+          pair={pair}
           raycast={raycast}
         />
       </group>
