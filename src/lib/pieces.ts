@@ -30,8 +30,6 @@ export type PieceKind =
 interface PieceDefinition {
   kind: PieceKind;
   label: string;
-  /** Keyboard shortcut for picking this piece */
-  hotkey: string;
   /** Sides with a groove opening, before rotation */
   ports: Direction[];
   /**
@@ -80,7 +78,6 @@ const PIECE_DEFINITIONS: PieceDefinition[] = [
   {
     kind: "straight",
     label: "Straight",
-    hotkey: "1",
     ports: ["+x", "-x"],
     exits: (arriving) =>
       arriving === "+x" || arriving === "-x" ? [arriving] : ["+x", "-x"],
@@ -89,7 +86,6 @@ const PIECE_DEFINITIONS: PieceDefinition[] = [
   {
     kind: "curve",
     label: "Curve",
-    hotkey: "2",
     ports: ["+x", "+y"],
     exits: (arriving) => {
       if (arriving === "-x") return ["+y"];
@@ -101,7 +97,6 @@ const PIECE_DEFINITIONS: PieceDefinition[] = [
   {
     kind: "tee",
     label: "Splitter",
-    hotkey: "3",
     ports: ["+x", "-y", "+y"],
     exits: (arriving) => {
       if (arriving === "-x") return ["-y", "+y"];
@@ -119,7 +114,6 @@ const PIECE_DEFINITIONS: PieceDefinition[] = [
   {
     kind: "cross",
     label: "Crossing",
-    hotkey: "4",
     ports: ALL,
     exits: ANY_WAY,
     grooves: [across("+x", "-x"), across("+y", "-y")],
@@ -127,7 +121,6 @@ const PIECE_DEFINITIONS: PieceDefinition[] = [
   {
     kind: "catcher",
     label: "Catcher",
-    hotkey: "5",
     ports: ["+x"],
     exits: () => ["+x"],
     // A wide bowl to catch marbles, with a groove leading out
@@ -139,7 +132,6 @@ const PIECE_DEFINITIONS: PieceDefinition[] = [
     // upside down, it catches marbles blown up from below.
     kind: "funnel",
     label: "Funnel",
-    hotkey: "f",
     ports: [],
     exits: ANY_WAY,
     grooves: [],
@@ -151,7 +143,6 @@ const PIECE_DEFINITIONS: PieceDefinition[] = [
   {
     kind: "block",
     label: "Block",
-    hotkey: "6",
     ports: [],
     exits: ANY_WAY,
     grooves: [],
@@ -161,7 +152,6 @@ const PIECE_DEFINITIONS: PieceDefinition[] = [
     // A vertical glass tube: marbles fall down it, or get blown up it
     kind: "tube",
     label: "Tube",
-    hotkey: "7",
     ports: [],
     exits: ANY_WAY,
     grooves: [],
@@ -174,7 +164,6 @@ const PIECE_DEFINITIONS: PieceDefinition[] = [
     // out of it onto the track one level down.
     kind: "outlet",
     label: "Outlet",
-    hotkey: "8",
     ports: ["+x"],
     exits: () => ["+x"],
     grooves: [],
@@ -187,7 +176,6 @@ const PIECE_DEFINITIONS: PieceDefinition[] = [
     // drop onto it are blown upwards, and up any tube above it
     kind: "fan",
     label: "Fan",
-    hotkey: "9",
     ports: ALL,
     exits: ANY_WAY,
     grooves: [
@@ -203,7 +191,6 @@ const PIECE_DEFINITIONS: PieceDefinition[] = [
     // marble into the air.
     kind: "seesaw",
     label: "Seesaw",
-    hotkey: "0",
     ports: [],
     exits: ANY_WAY,
     grooves: [],

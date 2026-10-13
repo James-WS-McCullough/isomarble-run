@@ -2,10 +2,13 @@
 
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Hotbar } from "@/components/Hotbar";
+import { InventoryDialog } from "@/components/InventoryDialog";
 import { RunsDialog } from "@/components/RunsDialog";
 import { SaveDialog } from "@/components/SaveDialog";
 import { Sidebar } from "@/components/Sidebar";
 import { useEditor } from "@/hooks/useEditor";
+import { useHotbar } from "@/hooks/useHotbar";
 import { useSaves } from "@/hooks/useSaves";
 import { exampleTrack } from "@/lib/example";
 import {
@@ -45,13 +48,25 @@ export default function Home() {
 
   const saves = useSaves();
   const [currentSaveId, setCurrentSaveId] = useState<string | null>(null);
-  const [dialog, setDialog] = useState<"save" | "runs" | null>(null);
+  const [dialog, setDialog] = useState<"save" | "runs" | "inventory" | null>(
+    null,
+  );
   const [toast, setToast] = useState<string | null>(null);
   const captureRef = useRef<(() => string) | null>(null);
+
+  const hotbar = useHotbar({
+    keysEnabled: dialog === null || dialog === "inventory",
+    // E opens the inventory over the board, and closes it again
+    onToggleInventory: () => {
+      if (dialog === null) setDialog("inventory");
+      else if (dialog === "inventory") setDialog(null);
+    },
+  });
 
   const [initialPieces] = useState(exampleTrack);
   const editor = useEditor({
     initialPieces,
+    held: hotbar.held,
     onDropMarble: dropMarble,
     shortcutsEnabled: dialog === null,
   });
@@ -176,12 +191,6 @@ export default function Home() {
   return (
     <div className="h-screen flex bg-stone-950">
       <Sidebar
-        tool={editor.tool}
-        onToolChange={editor.chooseTool}
-        pieceKind={editor.kind}
-        rotation={editor.rotation}
-        onPieceChange={editor.choosePiece}
-        onRotate={() => editor.rotate(1)}
         playing={playing}
         onPlayingChange={setPlaying}
         speed={speed}
@@ -226,13 +235,30 @@ export default function Home() {
             Paused · press Space to play
           </div>
         )}
+        <Hotbar
+          slots={hotbar.slots}
+          selected={hotbar.selected}
+          rotation={editor.rotation}
+          onSelect={hotbar.select}
+          onDrop={hotbar.place}
+          onOpenInventory={() => setDialog("inventory")}
+        />
         {toast && (
-          <output className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-stone-900/90 px-4 py-1.5 text-sm text-amber-100 shadow-lg pointer-events-none">
+          <output className="absolute bottom-32 left-1/2 -translate-x-1/2 rounded-full bg-stone-900/90 px-4 py-1.5 text-sm text-amber-100 shadow-lg pointer-events-none">
             {toast}
           </output>
         )}
       </main>
 
+      {dialog === "inventory" && (
+        <InventoryDialog
+          slots={hotbar.slots}
+          selected={hotbar.selected}
+          onSelect={hotbar.select}
+          onPlace={hotbar.place}
+          onClose={() => setDialog(null)}
+        />
+      )}
       {dialog === "save" && (
         <SaveDialog
           defaultName={`Run ${saves.saves.length + 1}`}

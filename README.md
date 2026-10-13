@@ -8,14 +8,16 @@ An isometric wooden marble run where impossible tracks work. Build a run out of 
 
 ## How to play
 
-| Tool | What it does |
-| --- | --- |
-| 🔨 Build (B) | Click the grid, or the top or side of a piece, to place the selected piece there. **R** rotates it. Pieces snap to the depth where they join up with the track, so you can build impossible joins just by drawing what you want to see. **[** and **]** slide a piece further away or closer without moving it on screen. |
-| ✋ Move (V) | Drag a piece somewhere else. **R** rotates the piece under the pointer. |
-| 🔮 Marble (M) | Click anywhere to drop a marble. |
-| 🧽 Erase (E) | Click a piece to remove it. |
+Build with the **hotbar** along the bottom, Minecraft style: press **1–9** to pick a slot, then click on the board. Press **E** to open the inventory and fill the slots with any piece, the marble or a tool (click an item to put it in the selected slot, or drag it onto any slot). Your hotbar is remembered.
 
-Pieces: **1** Straight, **2** Curve, **3** Splitter, **4** Crossing, **5** Catcher, **6** Block, **7** Tube, **8** Outlet, **F** Funnel, **9** Fan, **0** Seesaw.
+| In hand | What clicking does |
+| --- | --- |
+| 🧱 A piece | Place it on the grid, or on the top or side of a piece. **R** turns it. Pieces snap to the depth where they join up with the track, so you can build impossible joins just by drawing what you want to see. **[** and **]** slide a piece further away or closer without moving it on screen. |
+| 🔮 Marble | Drop a marble. |
+| ✋ Move | Drag a piece somewhere else. **R** turns the piece under the pointer. |
+| 🧽 Erase | Remove a piece. |
+
+Pieces: Straight, Curve, Splitter, Crossing, Catcher, Block, Tube, Outlet, Funnel, Fan and Seesaw.
 
 - **🧪 Tube**: a vertical glass pipe. Marbles that fall in the top drop down inside it and land on whatever is below.
 - **↪️ Outlet**: a tube with a spout. Marbles blown up to it shoot out of the spout onto the track; marbles rolling into the spout drop down the tube. Keep pressing **R** to turn it upside down: then the spout is at the bottom, and marbles dropping down the pipe come out onto the track one level down.
@@ -25,7 +27,10 @@ Pieces: **1** Straight, **2** Curve, **3** Splitter, **4** Crossing, **5** Catch
 
 | Control | Action |
 | --- | --- |
-| Right-click | Remove a piece (any tool) |
+| 1–9 | Pick a hotbar slot |
+| E | Inventory |
+| R / Shift+R | Turn the piece |
+| Right-click | Remove a piece, whatever's in hand |
 | Scroll | Zoom |
 | Shift-drag, middle-drag or arrow keys | Pan |
 | [ / ] | Slide the piece you're placing further away / closer |
@@ -79,10 +84,13 @@ Everything is drawn with [three.js](https://threejs.org) via [React Three Fiber]
 src/
   app/page.tsx            Page: wires the simulation, editor, sound and board together
   components/
-    Sidebar.tsx           Tools, piece palette, simulation and history controls
+    Sidebar.tsx           Marble, track and history controls
+    Hotbar.tsx            The numbered hotbar along the bottom of the board
+    InventoryDialog.tsx   Everything you can build with, to fill the hotbar
     PieceIcon.tsx         Isometric icons for the palette
   hooks/
-    useEditor.ts          Tools, keyboard shortcuts and the undoable track
+    useEditor.ts          Building with what's in hand, and the undoable track
+    useHotbar.ts          Hotbar slots, number keys and the remembered layout
     useHistory.ts         Undo/redo for any value
     useSaves.ts           Saved runs in local storage
   lib/
@@ -99,6 +107,7 @@ src/
       physics.ts          Tuning: gravity, speeds and bounciness
     track.ts              Placed pieces and fast lookups by on-screen position
     pieces.ts             Every kind of piece: its shape, openings and rules
+    hotbar.ts             What can go in the hotbar, and its default layout
     centrelines.ts        Building blocks for the grooves carved into pieces
     grooves.ts            The carved surface, shared by the 3D models and the physics
     paths.ts              Routes across the top of a piece

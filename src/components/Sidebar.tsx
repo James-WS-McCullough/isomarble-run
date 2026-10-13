@@ -1,14 +1,4 @@
-import type { Tool } from "@/hooks/useEditor";
-import { PIECES, type PieceKind } from "@/lib/pieces";
-import { PieceIcon } from "./PieceIcon";
-
 interface SidebarProps {
-  tool: Tool;
-  onToolChange: (tool: Tool) => void;
-  pieceKind: PieceKind;
-  rotation: number;
-  onPieceChange: (kind: PieceKind) => void;
-  onRotate: () => void;
   playing: boolean;
   onPlayingChange: (playing: boolean) => void;
   speed: number;
@@ -30,22 +20,10 @@ interface SidebarProps {
   runName: string | null;
 }
 
-const TOOLS: { id: Tool; name: string; icon: string; key: string }[] = [
-  { id: "build", name: "Build", icon: "🔨", key: "B" },
-  { id: "move", name: "Move", icon: "✋", key: "V" },
-  { id: "marble", name: "Marble", icon: "🔮", key: "M" },
-  { id: "erase", name: "Erase", icon: "🧽", key: "E" },
-];
-
-const TOOL_HINTS: Record<Tool, string> = {
-  build:
-    "Click to place a piece on the grid or on the side of another piece. R rotates it. Pieces snap to the depth where they join up with the track; [ and ] slide them further away or closer.",
-  move: "Drag a piece to move it. R rotates the piece under the pointer.",
-  marble: "Click anywhere to drop a marble.",
-  erase: "Click a piece to remove it.",
-};
-
 const SHORTCUTS: [string, string][] = [
+  ["1 – 9", "Pick a hotbar slot"],
+  ["E", "Inventory: fill the hotbar"],
+  ["R / Shift+R", "Turn the piece"],
   ["Right-click", "Remove a piece"],
   ["Scroll", "Zoom"],
   ["Shift-drag / arrows", "Pan"],
@@ -111,65 +89,6 @@ export function Sidebar(props: SidebarProps) {
             Clear marbles
           </button>
         </div>
-      </Section>
-
-      <Section title="Tools">
-        <div className="grid grid-cols-4 gap-1">
-          {TOOLS.map((tool) => (
-            <button
-              type="button"
-              key={tool.id}
-              onClick={() => props.onToolChange(tool.id)}
-              aria-pressed={props.tool === tool.id}
-              title={`${tool.name} (${tool.key})`}
-              className={`p-2 rounded border text-xs flex flex-col items-center gap-0.5 transition-colors ${
-                props.tool === tool.id
-                  ? "border-amber-500 bg-amber-900/40"
-                  : "border-stone-600 bg-stone-800 hover:bg-stone-700"
-              }`}
-            >
-              <span className="text-lg">{tool.icon}</span>
-              {tool.name}
-            </button>
-          ))}
-        </div>
-        <p className="mt-2 text-xs text-stone-400">{TOOL_HINTS[props.tool]}</p>
-      </Section>
-
-      <Section title="Pieces">
-        <div className="grid grid-cols-3 gap-1">
-          {PIECES.map((piece) => {
-            const selected =
-              props.tool === "build" && props.pieceKind === piece.kind;
-            return (
-              <button
-                type="button"
-                key={piece.kind}
-                onClick={() => props.onPieceChange(piece.kind)}
-                aria-pressed={selected}
-                title={`${piece.label} (${piece.hotkey.toUpperCase()})`}
-                className={`p-1 rounded border flex flex-col items-center text-[11px] transition-colors ${
-                  selected
-                    ? "border-amber-500 bg-amber-900/40"
-                    : "border-stone-600 bg-stone-800 hover:bg-stone-700"
-                }`}
-              >
-                <PieceIcon
-                  kind={piece.kind}
-                  rotation={selected ? props.rotation : 0}
-                />
-                {piece.label}
-              </button>
-            );
-          })}
-        </div>
-        <button
-          type="button"
-          onClick={props.onRotate}
-          className={`${button} w-full mt-2 bg-stone-700 hover:bg-stone-600`}
-        >
-          ⟳ Rotate (R)
-        </button>
       </Section>
 
       <Section title="Track">

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { normaliseRotation, PIECES, type PieceKind } from "@/lib/pieces";
+import { type HotbarItem, isPiece } from "@/lib/hotbar";
+import { normaliseRotation, type PieceKind } from "@/lib/pieces";
 import { fitsAt, slideCell, snapToJoins } from "@/lib/placement";
 import { type Cell, cellKey, type Vec3 } from "@/lib/space";
 import { createPiece, type Piece } from "@/lib/track";
@@ -9,7 +10,8 @@ import type { Ghost } from "@/three/Board";
 import type { BoardTarget } from "@/three/targeting";
 import { useHistory } from "./useHistory";
 
-export type Tool = "build" | "move" | "marble" | "erase";
+/** What clicking on the board does, given what's in hand */
+export type Tool = "build" | "move" | "marble" | "erase" | "none";
 
 interface Drag {
   pieceId: string;
@@ -19,6 +21,8 @@ interface Drag {
 
 interface EditorOptions {
   initialPieces: Piece[];
+  /** What's in hand, from the hotbar: a piece, the marble or a tool */
+  held: HotbarItem | null;
   onDropMarble: (point: Vec3) => void;
   /** Turn keyboard shortcuts off, e.g. while a dialog is open */
   shortcutsEnabled?: boolean;
@@ -29,27 +33,30 @@ function sameCell(a: Cell, b: Cell): boolean {
 }
 
 /**
- * Building tools:
- * - build: click to place the selected piece, R to rotate it. Pieces snap
- *   to the depth along the line of sight where they join up with the track;
- *   [ and ] slide them further away or closer.
- * - move: drag a piece somewhere else, R to rotate the piece under the pointer
+ * Building with whatever's in hand:
+ * - a piece: click to place it, R to turn it. Pieces snap to the depth
+ *   along the line of sight where they join up with the track; [ and ]
+ *   slide them further away or closer.
+ * - move: drag a piece somewhere else, R to turn the piece under the pointer
  * - marble: click to drop a marble
  * - erase: click a piece to remove it
- * Right-click also removes a piece with any tool, and every change can be
+ * Right-click removes a piece whatever's in hand, and every change can be
  * undone.
  */
 export function useEditor({
   initialPieces,
+  held,
   onDropMarble,
   shortcutsEnabled = true,
 }: EditorOptions) {
   const history = useHistory<Piece[]>(initialPieces);
   const pieces = history.value;
 
-  const [tool, setTool] = useState<Tool>("build");
-  const [kind, setKind] = useState<PieceKind>("straight");
-  const [rotation, setRotation] = useState(0);
+  const tool: Tool = held === null ? "none" : isPiece(held) ? "build" : held;
+  const kind: PieceKind = held !== null && isPiece(held) ? held : "straight";
+  const [turns, setTurns] = useState(0);
+  // Pieces turn different numbers of ways, so keep the turn in range
+  const rotation = normaliseRotation(kind, turns);
   const [target, setTarget] = useState<BoardTarget | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
   /** Extra steps along the line of sight, chosen with [ and ] */
@@ -168,23 +175,11 @@ export function useEditor({
     setDrag(null);
   };
 
-  const chooseTool = (next: Tool) => {
-    setTool(next);
-    setDrag(null);
-  };
-
-  const choosePiece = (next: PieceKind) => {
-    setKind(next);
-    // Some pieces turn fewer or more ways than others
-    setRotation((current) => normaliseRotation(next, current));
-    setTool("build");
-  };
-
   const rotate = (turns: number) => {
     if (tool === "move" && target?.pieceId) {
       rotatePiece(target.pieceId, turns);
     } else {
-      setRotation((current) => normaliseRotation(kind, current + turns));
+      setTurns(normaliseRotation(kind, rotation + turns));
     }
   };
 
@@ -208,14 +203,6 @@ export function useEditor({
         return;
       } else if (key === "r") {
         rotate(event.shiftKey ? -1 : 1);
-      } else if (key === "b") {
-        chooseTool("build");
-      } else if (key === "v") {
-        chooseTool("move");
-      } else if (key === "m") {
-        chooseTool("marble");
-      } else if (key === "e") {
-        chooseTool("erase");
       } else if ((key === "delete" || key === "backspace") && target?.pieceId) {
         removePiece(target.pieceId);
       } else if (key === "escape") {
@@ -224,9 +211,6 @@ export function useEditor({
         setDepthNudge((n) => n - 1);
       } else if (key === "]") {
         setDepthNudge((n) => n + 1);
-      } else {
-        const piece = PIECES.find((p) => p.hotkey === key);
-        if (piece) choosePiece(piece.kind);
       }
     };
     window.addEventListener("keydown", onKeyDown);
@@ -261,9 +245,7 @@ export function useEditor({
     pieces,
     displayedPieces,
     tool,
-    chooseTool,
     kind,
-    choosePiece,
     rotation,
     rotate,
     ghost,
