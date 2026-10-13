@@ -10,22 +10,23 @@ import { getPieceGeometry } from "./pieceGeometry";
 import { SimulationContext } from "./SimulationContext";
 
 /**
- * Where the flipper points, as an angle round from the piece's +x towards
- * +y: across the branch the next marble won't take, and a little back from
- * the stem. Measured from 0 to 2π so it swings round the back as it flips,
- * never through the stem.
+ * The flipper is a T on a pin where the branches meet. Its leg points up
+ * the stem, tilted to one side so it steers marbles into the other branch;
+ * its top bar's arms reach into the branches. A marble rolling out down a
+ * branch pushes that arm and rocks the T over.
+ *
+ * How far the leg tilts from straight up the stem (radians, towards +y
+ * when sending marbles down -y)
  */
-const POINTING = {
-  /** Sending marbles down -y: blocking +y */
-  "-y": Math.atan2(1, -0.35),
-  /** Sending marbles down +y: blocking -y */
-  "+y": 2 * Math.PI - Math.atan2(1, -0.35),
-};
-/** How fast the flipper swings over (radians per second) */
-const SWING_SPEED = 14;
+const TILT = 0.4;
+/** How fast the T rocks over (radians per second) */
+const SWING_SPEED = 6;
 
-const paddleGeometry = new THREE.BoxGeometry(0.36, 0.17, 0.04);
-paddleGeometry.translate(0.18, 0.085, 0);
+const legGeometry = new THREE.BoxGeometry(0.3, 0.16, 0.045);
+legGeometry.translate(0.15, 0.08, 0);
+// The top bar runs across the piece: its y, which is three.js z
+const barGeometry = new THREE.BoxGeometry(0.045, 0.16, 0.56);
+barGeometry.translate(0, 0.08, 0);
 const pinGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.22, 16);
 pinGeometry.translate(0, 0.11, 0);
 
@@ -39,17 +40,18 @@ const pinMaterial = new THREE.MeshStandardMaterial({
   metalness: 0.7,
 });
 
-/** A splitter-shaped block with a flipper that swings to follow the switch */
+/** A splitter-shaped block with a T that rocks to follow the switch */
 export function FlipFlop({ pieceId, look, raycast }: ModelProps) {
   const simulation = useContext(SimulationContext);
   const block = getPieceGeometry("flipflop");
   const flipper = useRef<THREE.Group>(null);
-  const angle = useRef(POINTING["-y"]);
+  const angle = useRef(TILT);
 
   useFrame((_, delta) => {
     if (!flipper.current) return;
     const side = simulation && pieceId ? simulation.switchSide(pieceId) : "-y";
-    const target = side === "+y" ? POINTING["+y"] : POINTING["-y"];
+    // Sending marbles down -y, the leg leans towards +y, and the other way
+    const target = side === "+y" ? -TILT : TILT;
     const step = SWING_SPEED * delta;
     angle.current += Math.max(-step, Math.min(step, target - angle.current));
     // Three.js turns +x towards -z, which is the piece's -y
@@ -70,7 +72,12 @@ export function FlipFlop({ pieceId, look, raycast }: ModelProps) {
       />
       <group ref={flipper} position={[0, 0.5 - GROOVE_DEPTH, 0]}>
         <mesh
-          geometry={paddleGeometry}
+          geometry={legGeometry}
+          material={paddleMaterial}
+          raycast={() => null}
+        />
+        <mesh
+          geometry={barGeometry}
           material={paddleMaterial}
           raycast={() => null}
         />

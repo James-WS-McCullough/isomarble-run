@@ -2,8 +2,9 @@ import type { Direction } from "../directions";
 import type { Piece } from "../track";
 
 /**
- * The flip-flop switches on the track, and which way each one's flipper
- * points. Sides are the piece's own, before it's turned: -y or +y.
+ * The flip-flop switches on the track, and which branch each one's T sends
+ * the next marble down. Sides are the piece's own, before it's turned: -y
+ * or +y.
  */
 export class Switches {
   private readonly sides = new Map<string, Direction>();
@@ -14,13 +15,11 @@ export class Switches {
   }
 
   /**
-   * The branch a marble coming down the stem takes. It knocks the flipper
-   * over, so the next marble goes the other way.
+   * A marble rolling out down a branch pushes the T's arm on that side,
+   * rocking it over so the next marble goes the other way
    */
-  take(pieceId: string): Direction {
-    const side = this.side(pieceId);
-    this.sides.set(pieceId, side === "-y" ? "+y" : "-y");
-    return side;
+  flip(pieceId: string) {
+    this.sides.set(pieceId, this.side(pieceId) === "-y" ? "+y" : "-y");
   }
 
   /** Forget switches that are gone */

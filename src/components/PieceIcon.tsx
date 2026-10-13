@@ -139,16 +139,37 @@ function PortalDetails({ rotation }: { rotation: number }) {
   );
 }
 
-/** The flip-flop's flipper, across the branch the next marble won't take */
+/**
+ * The flip-flop's T: its leg leaning up the stem to steer marbles into one
+ * branch, its top bar's arms reaching into both
+ */
 function FlipFlopDetails({ rotation }: { rotation: number }) {
-  const tip = rotatePoint({ x: -0.12, y: 0.34 }, rotation);
+  const tilt = 0.4;
+  const leg = rotatePoint(
+    { x: 0.3 * Math.cos(tilt), y: 0.3 * Math.sin(tilt) },
+    rotation,
+  );
+  const armA = rotatePoint(
+    { x: -0.28 * Math.sin(tilt), y: 0.28 * Math.cos(tilt) },
+    rotation,
+  );
+  const armB = { x: -armA.x, y: -armA.y };
+  const stroke = {
+    stroke: "#6b4423",
+    strokeWidth: 3,
+    strokeLinecap: "round",
+  } as const;
   return (
-    <polyline
-      points={[project(0, 0), project(tip.x, tip.y)].join(" ")}
-      stroke="#6b4423"
-      strokeWidth="3"
-      strokeLinecap="round"
-    />
+    <>
+      <polyline
+        points={[project(0, 0), project(leg.x, leg.y)].join(" ")}
+        {...stroke}
+      />
+      <polyline
+        points={[project(armA.x, armA.y), project(armB.x, armB.y)].join(" ")}
+        {...stroke}
+      />
+    </>
   );
 }
 

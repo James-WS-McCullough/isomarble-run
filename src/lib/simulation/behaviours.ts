@@ -176,13 +176,26 @@ export const BEHAVIOURS: Partial<Record<PieceKind, PieceBehaviour>> = {
     },
   },
 
-  // Down the stem, or dropped on: off down the branch the flipper points
-  // to, flipping it for the next marble
+  // Down the stem, or dropped on: steered by the T's leg down the branch
+  // it's tilted away from
   flipflop: {
     chooseExit(world, piece, arriving) {
       const local = arriving && rotateDirection(arriving, -piece.rotation);
       if (local === "-y" || local === "+y") return undefined;
-      return rotateDirection(world.switches.take(piece.id), piece.rotation);
+      return rotateDirection(world.switches.side(piece.id), piece.rotation);
+    },
+    // Rolling out down a branch, it pushes the T's arm on that side and
+    // rocks it over for the next marble
+    leave(world, _marble, rolling, _events) {
+      const exit = rotateDirection(rolling.exit, -rolling.piece.rotation);
+      const entry =
+        rolling.entry &&
+        rotateDirection(rolling.entry, -rolling.piece.rotation);
+      const fromBranch = entry === "-y" || entry === "+y";
+      if ((exit === "-y" || exit === "+y") && !fromBranch) {
+        world.switches.flip(rolling.piece.id);
+      }
+      return false;
     },
   },
 
