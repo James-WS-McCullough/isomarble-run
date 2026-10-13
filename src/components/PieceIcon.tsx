@@ -28,6 +28,7 @@ const ICONS: Partial<Record<PieceKind, (props: IconProps) => JSX.Element>> = {
   funnel: FunnelIcon,
   seesaw: SeesawIcon,
   vortex: VortexIcon,
+  ramp: RampIcon,
 };
 
 /** Extra details drawn over a piece's top face */
@@ -265,6 +266,67 @@ function VortexIcon() {
   );
 }
 
+/**
+ * A ramp as it sits on the board: a wedge sloping down towards its +x end,
+ * with its groove running down the slope
+ */
+function RampIcon({ rotation }: IconProps) {
+  const s = 0.72;
+  const at = (x: number, y: number, z: number) => {
+    const p = rotatePoint({ x, y }, rotation);
+    return project3(p.x * s, p.y * s, z * s);
+  };
+  const down = rotatePoint({ x: 1, y: 0 }, rotation);
+  const side = rotatePoint({ x: 0, y: 1 }, rotation);
+  // Faces turned towards the camera, which looks along (-1, -1, -1)
+  const facing = (v: Point) => v.x + v.y > 0;
+  const nearSide = facing(side) ? 0.5 : -0.5;
+  const faces = [
+    // The side triangle nearer the camera
+    [
+      at(-0.5, nearSide, 0.5),
+      at(-0.5, nearSide, -0.5),
+      at(0.5, nearSide, -0.5),
+    ],
+    // The tall back of the high end, if it faces the camera
+    ...(facing({ x: -down.x, y: -down.y })
+      ? [
+          [
+            at(-0.5, -0.5, 0.5),
+            at(-0.5, 0.5, 0.5),
+            at(-0.5, 0.5, -0.5),
+            at(-0.5, -0.5, -0.5),
+          ],
+        ]
+      : []),
+    // The slope
+    [
+      at(-0.5, -0.5, 0.5),
+      at(-0.5, 0.5, 0.5),
+      at(0.5, 0.5, -0.5),
+      at(0.5, -0.5, -0.5),
+    ],
+  ];
+  return (
+    <Icon>
+      {faces.map((face) => (
+        <polygon
+          key={face.join(" ")}
+          points={face.join(" ")}
+          {...WOOD}
+          strokeWidth="1"
+          strokeLinejoin="round"
+        />
+      ))}
+      <polyline
+        points={[at(-0.5, 0, 0.5), at(0.5, 0, -0.5)].join(" ")}
+        stroke={GROOVE}
+        strokeWidth="5"
+      />
+    </Icon>
+  );
+}
+
 /** The cup seesaw side-on, tipped with a marble waiting in the low cup */
 function SeesawIcon() {
   return (
@@ -288,6 +350,13 @@ function SeesawIcon() {
 function project(x: number, y: number): string {
   const right = ((x - y) / Math.SQRT2) * SCALE;
   const down = ((x + y) / Math.sqrt(6)) * SCALE;
+  return `${(SIZE / 2 + right).toFixed(2)},${(SIZE / 2 + down).toFixed(2)}`;
+}
+
+/** Isometric projection of a point on or above a piece's middle */
+function project3(x: number, y: number, z: number): string {
+  const right = ((x - y) / Math.SQRT2) * SCALE;
+  const down = ((x + y - 2 * z) / Math.sqrt(6)) * SCALE;
   return `${(SIZE / 2 + right).toFixed(2)},${(SIZE / 2 + down).toFixed(2)}`;
 }
 

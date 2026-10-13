@@ -1,8 +1,15 @@
-import { CENTRE, type Centreline, type Point, portPoint } from "./centrelines";
+import {
+  CENTRE,
+  type Centreline,
+  type Point,
+  portPoint,
+  rotatePoint,
+} from "./centrelines";
 import { type Direction, oppositeDirection } from "./directions";
 import {
   grooveCentrelines,
   isFlatTopped,
+  isSloped,
   isTube,
   type PieceKind,
   piecePorts,
@@ -102,6 +109,16 @@ export function surfaceHeight(lines: Centreline[], p: Point): number {
   return height;
 }
 
+/**
+ * How far a ramp's top has dropped at a point: nothing at its high end, a
+ * whole level at its low end. Nothing for any other piece.
+ */
+export function slopeDrop(kind: PieceKind, rotation: number, p: Point): number {
+  if (!isSloped(kind)) return 0;
+  const along = rotatePoint(p, -rotation).x;
+  return Math.min(1, Math.max(0, along + 0.5));
+}
+
 /** Height of a marble's centre resting at a point on a piece */
 export function marbleHeightAt(
   kind: PieceKind,
@@ -113,7 +130,11 @@ export function marbleHeightAt(
   // down, for an upside-down outlet's spout
   if (isTube(kind)) return GROOVE_REST_HEIGHT + portLevel({ kind, rotation });
   const lines = grooveCentrelines(kind, rotation);
-  return Math.min(FLAT_REST_HEIGHT, surfaceHeight(lines, p) + MARBLE_RADIUS);
+  const resting = Math.min(
+    FLAT_REST_HEIGHT,
+    surfaceHeight(lines, p) + MARBLE_RADIUS,
+  );
+  return resting - slopeDrop(kind, rotation, p);
 }
 
 /** Whether a piece has a bowl in the middle, like a catcher */

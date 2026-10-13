@@ -5,7 +5,22 @@ export const PHYSICS = {
   CRUISE_SPEED: 2.5,
   CRUISE_ACCELERATION: 4,
   /** How quickly speed above cruising speed fades away on a track */
-  FRICTION: 1.2,
+  FRICTION: 0.6,
+  /**
+   * Share of gravity that speeds a marble down a slope: a rolling ball
+   * spends some of it on spinning faster
+   */
+  ROLLING_GRAVITY: 5 / 7,
+  /**
+   * Rolling onto the top of a ramp faster than this, a marble flies off
+   * its lip rather than following the slope down
+   */
+  LIP_JUMP_SPEED: 4.5,
+  /**
+   * Coming up over the top of a ramp faster than this, a marble takes off
+   * like a ski jump, even with more track to roll on to
+   */
+  SKI_JUMP_SPEED: 3,
   /** Top speed along a track, and top falling speed */
   MAX_SPEED: 9,
   /** Share of horizontal / vertical speed kept as rolling speed on landing */

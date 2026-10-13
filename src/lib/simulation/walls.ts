@@ -1,3 +1,4 @@
+import { slopeDrop } from "../grooves";
 import { isSolid } from "../pieces";
 import { MARBLE_RADIUS, type Vec3 } from "../space";
 import type { TrackIndex } from "../track";
@@ -26,8 +27,11 @@ export function bounceOffWalls(
         if (!piece || !isSolid(piece.kind)) continue;
 
         const p = marble.position;
-        // Only below the top of the block, and not under it
-        if (p.z >= cell.z + 0.5 || p.z < cell.z - 0.5 - r) continue;
+        // Only below the top of the block (lower down a ramp's slope), and
+        // not under it
+        const local = { x: p.x - cell.x, y: p.y - cell.y };
+        const top = cell.z + 0.5 - slopeDrop(piece.kind, piece.rotation, local);
+        if (p.z >= top || p.z < cell.z - 0.5 - r) continue;
 
         const offX = p.x - clamp(p.x, cell.x - 0.5, cell.x + 0.5);
         const offY = p.y - clamp(p.y, cell.y - 0.5, cell.y + 0.5);

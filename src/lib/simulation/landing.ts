@@ -1,3 +1,5 @@
+import { marbleHeightAt } from "../grooves";
+import { isSloped } from "../pieces";
 import { depthOf, slideAlongView, type Vec3 } from "../space";
 import {
   type Piece,
@@ -26,6 +28,9 @@ const FRONT_REACH = 0.45;
  * - A marble that set off towards the camera can also land on a face that
  *   is in front of it. It lands as soon as it reaches the back edge of that
  *   face on screen, before the face would hide any of it.
+ * - Ramps slope, so a marble lands on one when it really touches the slope.
+ *   Seen from further off, a ramp counts as a face at the height of its top
+ *   end, and the marble slides along the line of sight onto the slope.
  */
 export function findLanding(
   track: TrackIndex,
@@ -62,7 +67,12 @@ export function findLanding(
         y: Math.round(point.y),
         z: level,
       });
-      if (piece && restHeight(piece.kind) === rest && !track.isCovered(piece)) {
+      if (
+        piece &&
+        restHeight(piece.kind) === rest &&
+        !isSloped(piece.kind) &&
+        !track.isCovered(piece)
+      ) {
         consider(piece, point, f);
       }
     }
@@ -85,6 +95,8 @@ export function findLanding(
         B++
       ) {
         for (const piece of track.piecesInColumn({ a: A, b: B }, rest)) {
+          // Right by a ramp, only really touching its slope counts
+          if (isSloped(piece.kind) && isNear(piece, to)) continue;
           const faceHeight = piece.cell.z + rest - 0.05;
           const inFront = faceHeight > to.z;
           if (inFront && !marble.headingForward) continue;
@@ -125,9 +137,10 @@ export function findLanding(
           if (d > 1) continue;
 
           const point = lerp(from, to, f);
+          const onFace = slideAlongView(point, piece.cell.z + rest - point.z);
           consider(
             piece,
-            slideAlongView(point, piece.cell.z + rest - point.z),
+            isSloped(piece.kind) ? ontoSlope(piece, onFace) : onFace,
             f,
           );
         }
@@ -135,7 +148,56 @@ export function findLanding(
     }
   }
 
+  // Touching the slope of a ramp for real
+  const x = Math.round(to.x);
+  const y = Math.round(to.y);
+  for (let z = Math.round(to.z) - 1; z <= Math.round(to.z) + 1; z++) {
+    const piece = track.pieceAt({ x, y, z });
+    if (!piece || !isSloped(piece.kind) || track.isCovered(piece)) continue;
+    const above0 = from.z - restingOn(piece, from);
+    const above1 = to.z - restingOn(piece, to);
+    if (above0 > 0 && above1 <= 0) {
+      const f = above0 / (above0 - above1);
+      consider(piece, lerp(from, to, f), f);
+    }
+  }
+
   // TypeScript can't see `consider` setting `best`
   const found = best as Landing | null;
   return found && { piece: found.piece, point: found.point };
+}
+
+/** Height of a marble's centre resting on a piece, under a point */
+function restingOn(piece: Piece, p: Vec3): number {
+  const local = { x: p.x - piece.cell.x, y: p.y - piece.cell.y };
+  return piece.cell.z + marbleHeightAt(piece.kind, piece.rotation, local);
+}
+
+/** Whether a point is in a piece's cell, or right next to it */
+function isNear(piece: Piece, p: Vec3): boolean {
+  const { x, y, z } = piece.cell;
+  return (
+    Math.abs(p.x - x) < 1 && Math.abs(p.y - y) < 1 && Math.abs(p.z - z) < 1
+  );
+}
+
+/**
+ * Slide a point along the line of sight until it rests on a ramp's slope.
+ * (A ramp sloping down away from the camera is seen edge on, so there's
+ * nowhere better to slide to: it stays put.)
+ */
+function ontoSlope(piece: Piece, p: Vec3): Vec3 {
+  const gap = (k: number) => {
+    const q = slideAlongView(p, k);
+    return q.z - restingOn(piece, q);
+  };
+  let low = -1.5;
+  let high = 1.5;
+  if (gap(low) > 0 || gap(high) < 0) return p;
+  for (let i = 0; i < 30; i++) {
+    const middle = (low + high) / 2;
+    if (gap(middle) > 0) high = middle;
+    else low = middle;
+  }
+  return slideAlongView(p, (low + high) / 2);
 }

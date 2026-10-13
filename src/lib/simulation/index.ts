@@ -4,9 +4,14 @@ import {
   directionOfVelocity,
   oppositeDirection,
 } from "../directions";
-import { nearestOnRoute, routeToExit } from "../grooves";
 import { Path, routeBetween } from "../paths";
-import { isFlatTopped, isTube, pieceExits, piecePorts } from "../pieces";
+import {
+  isFlatTopped,
+  isSloped,
+  isTube,
+  pieceExits,
+  piecePorts,
+} from "../pieces";
 import {
   depthOf,
   fromScreen,
@@ -16,7 +21,7 @@ import {
   type Vec3,
 } from "../space";
 import { type Piece, restHeight, TrackIndex } from "../track";
-import { BEHAVIOURS, type World } from "./behaviours";
+import { BEHAVIOURS, takeOff, type World } from "./behaviours";
 import { collideMarbles } from "./collisions";
 import { Dispensers } from "./dispensers";
 import { stepVanishing } from "./holes";
@@ -32,11 +37,18 @@ import {
   snapTo,
 } from "./marble";
 import { PHYSICS } from "./physics";
-import { densify, overTheRim, pathOnPiece, pick } from "./routes";
+import {
+  densify,
+  overTheRim,
+  pathOnPiece,
+  pick,
+  settle,
+  turnAround,
+} from "./routes";
 import { Seesaws } from "./seesaws";
 import { Switches } from "./switches";
 import { catchFromBelow, stepInTube, tubeCell } from "./tubes";
-import { clamp, scale } from "./vector";
+import { scale } from "./vector";
 import { stepSwirling } from "./vortex";
 import { bounceOffWalls } from "./walls";
 
@@ -252,7 +264,20 @@ export class Simulation {
   }
 
   private stepRolling(marble: Marble, dt: number, events: SimulationEvent[]) {
-    if (marble.speed < PHYSICS.CRUISE_SPEED) {
+    const onSlope = motionAs(marble, "rolling");
+    if (onSlope && isSloped(onSlope.piece.kind)) {
+      // Gravity speeds it down a ramp, and holds it back going up one,
+      // until it rolls back down
+      const climb = onSlope.path.tangentAt(onSlope.distance).z;
+      marble.speed = Math.min(
+        PHYSICS.MAX_SPEED,
+        marble.speed - PHYSICS.GRAVITY * PHYSICS.ROLLING_GRAVITY * climb * dt,
+      );
+      if (marble.speed < 0) {
+        turnAround(marble, onSlope, this.random);
+        marble.speed = -marble.speed;
+      }
+    } else if (marble.speed < PHYSICS.CRUISE_SPEED) {
       marble.speed = Math.min(
         PHYSICS.CRUISE_SPEED,
         marble.speed + PHYSICS.CRUISE_ACCELERATION * dt,
@@ -352,40 +377,15 @@ export class Simulation {
     }
 
     // Settle into its groove, and roll out the way it was heading
-    const v = marble.velocity;
+    const v = { ...marble.velocity };
     const horizontal = Math.hypot(v.x, v.y);
     const arriving = directionOfVelocity(v.x, v.y, PHYSICS.DROP_SPEED);
-    const exit = this.chooseExit(piece, arriving);
-
-    // Settle from where it landed into the groove, then follow it out
-    const local = {
-      x: clamp(point.x - piece.cell.x, -0.5, 0.5),
-      y: clamp(point.y - piece.cell.y, -0.5, 0.5),
-    };
-    const route = routeToExit(piece.kind, piece.rotation, exit);
-    const { point: inGroove, next } = nearestOnRoute(route, local);
-    // Follow the shape of the wood as it rolls down into the groove
-    const path = pathOnPiece(
-      piece,
-      densify([local, inGroove, ...route.slice(next)]),
-    );
-
+    settle(marble, piece, point, this.chooseExit(piece, arriving));
     marble.speed = Math.min(
       PHYSICS.MAX_SPEED,
       horizontal * PHYSICS.LANDING_KEEP_HORIZONTAL +
         Math.abs(v.z) * PHYSICS.LANDING_KEEP_VERTICAL,
     );
-    marble.velocity = { x: 0, y: 0, z: 0 };
-    marble.position = point;
-    snapTo(marble, path.points[0]);
-    marble.motion = {
-      mode: "rolling",
-      piece,
-      path,
-      distance: 0,
-      exit,
-      entry: null,
-    };
 
     events.push({ type: "land", marbleId: marble.id, impact: Math.abs(v.z) });
     events.push({ type: "visit", pieceId: piece.id, marbleId: marble.id });
@@ -413,8 +413,11 @@ export class Simulation {
     const throughSide = !isFlatTopped(piece.kind) && !intoOpening;
 
     // From down in a groove, a side with no opening is a solid wall, and
-    // the glass sides of a tube always are
-    if (throughSide && (!fromFlat || isTube(piece.kind))) {
+    // the glass sides of a tube and the sloping sides of a ramp always are
+    if (
+      throughSide &&
+      (!fromFlat || isTube(piece.kind) || isSloped(piece.kind))
+    ) {
       // Touch the wall at groove height, then head back
       const side = DIRECTION_VECTORS[entrySide];
       const edge = {
@@ -473,12 +476,11 @@ export class Simulation {
   /** Roll off the end of the track into the air */
   private launch(marble: Marble, direction: Direction) {
     const v = DIRECTION_VECTORS[direction];
-    marble.velocity = { x: v.x * marble.speed, y: v.y * marble.speed, z: 0 };
-    marble.motion = FLYING;
-
-    // Heading towards the camera, it can land on anything that looks below
-    // it. Heading away, it drops behind pieces that are in front of it.
-    marble.headingForward = direction === "+x" || direction === "+y";
+    takeOff(
+      marble,
+      { x: v.x * marble.speed, y: v.y * marble.speed, z: 0 },
+      direction,
+    );
   }
 }
 

@@ -30,7 +30,8 @@ export type PieceKind =
   | "hole"
   | "flipflop"
   | "portal"
-  | "vortex";
+  | "vortex"
+  | "ramp";
 
 interface PieceDefinition {
   kind: PieceKind;
@@ -69,6 +70,11 @@ interface PieceDefinition {
   orientations?: number;
   /** Whether turning it can flip it upside down */
   flips?: boolean;
+  /**
+   * A ramp: its top slopes down from its -x side, level with the track
+   * here, to its +x side, level with the track one level down
+   */
+  slope?: boolean;
 }
 
 const ALL: Direction[] = ["+x", "+y", "-x", "-y"];
@@ -127,6 +133,17 @@ const PIECE_DEFINITIONS: PieceDefinition[] = [
     ports: ALL,
     exits: ANY_WAY,
     grooves: [across("+x", "-x"), across("+y", "-y")],
+  },
+  {
+    // A wedge with a groove sloping down a level, from its -x end to its +x
+    // end. Marbles speed up rolling down it and slow down going up; fast
+    // ones can fly off its ends.
+    kind: "ramp",
+    label: "Ramp",
+    ports: ["+x", "-x"],
+    exits: (arriving) => (arriving === "-x" ? ["-x"] : ["+x"]),
+    grooves: [across("+x", "-x")],
+    slope: true,
   },
   {
     kind: "catcher",
@@ -371,15 +388,28 @@ export function isUpsideDown(piece: {
   return turn >= orientations(piece.kind) / 2;
 }
 
+/** Whether a piece is a ramp, sloping down a level */
+export function isSloped(kind: PieceKind): boolean {
+  return getPiece(kind).slope === true;
+}
+
+/** The side a ramp slopes down towards */
+export function downhill(rotation: number): Direction {
+  return rotateDirection("+x", rotation);
+}
+
 /**
- * How many levels below a piece its side openings are. An upside-down
- * piece's are at its bottom, level with the track one level down. (A piece
- * with no openings, like a funnel, stays where it is.)
+ * How many levels below a piece its opening on `side` is (or its side
+ * openings, if no side is given). An upside-down piece's are at its bottom,
+ * level with the track one level down; so is the low end of a ramp. (A
+ * piece with no openings, like a funnel, stays where it is.)
  */
-export function portLevel(piece: {
-  kind: PieceKind;
-  rotation: number;
-}): number {
-  const hasOpenings = getPiece(piece.kind).ports.length > 0;
-  return hasOpenings && isUpsideDown(piece) ? -1 : 0;
+export function portLevel(
+  piece: { kind: PieceKind; rotation: number },
+  side?: Direction,
+): number {
+  const definition = getPiece(piece.kind);
+  if (definition.ports.length > 0 && isUpsideDown(piece)) return -1;
+  if (definition.slope && side === downhill(piece.rotation)) return -1;
+  return 0;
 }

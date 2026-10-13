@@ -28,7 +28,7 @@ export function countJoins(
   let joins = 0;
   for (const side of sides) {
     const neighbour = track.findConnectionFrom(
-      portCell({ kind, rotation, cell }),
+      portCell({ kind, rotation, cell }, side),
       side,
     );
     if (!neighbour) continue;

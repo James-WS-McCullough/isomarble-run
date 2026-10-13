@@ -3,11 +3,18 @@ import {
   type Direction,
   oppositeDirection,
 } from "../directions";
-import { hasBowl, marbleHeightAt } from "../grooves";
+import {
+  hasBowl,
+  marbleHeightAt,
+  nearestOnRoute,
+  routeToExit,
+} from "../grooves";
 import { Path, routeBetween } from "../paths";
 import { pieceExits } from "../pieces";
+import type { Vec3 } from "../space";
 import type { Piece } from "../track";
-import type { Marble, Rolling } from "./marble";
+import { type Marble, type Rolling, snapTo } from "./marble";
+import { clamp } from "./vector";
 
 /** Paths for marbles rolling across pieces */
 
@@ -37,6 +44,41 @@ export function pathOnPiece(
     })),
     turns,
   );
+}
+
+/**
+ * A marble that came down on a piece at `point` settles from there into its
+ * groove, and follows it out through `exit`
+ */
+export function settle(
+  marble: Marble,
+  piece: Piece,
+  point: Vec3,
+  exit: Direction,
+) {
+  const local = {
+    x: clamp(point.x - piece.cell.x, -0.5, 0.5),
+    y: clamp(point.y - piece.cell.y, -0.5, 0.5),
+  };
+  const route = routeToExit(piece.kind, piece.rotation, exit);
+  const { point: inGroove, next } = nearestOnRoute(route, local);
+  // Follow the shape of the wood as it rolls down into the groove
+  const path = pathOnPiece(
+    piece,
+    densify([local, inGroove, ...route.slice(next)]),
+  );
+
+  marble.velocity = { x: 0, y: 0, z: 0 };
+  marble.position = point;
+  snapTo(marble, path.points[0]);
+  marble.motion = {
+    mode: "rolling",
+    piece,
+    path,
+    distance: 0,
+    exit,
+    entry: null,
+  };
 }
 
 /**

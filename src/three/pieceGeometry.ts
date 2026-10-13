@@ -1,7 +1,7 @@
 import * as THREE from "three";
-import { surfaceHeight } from "@/lib/grooves";
+import { slopeDrop, surfaceHeight } from "@/lib/grooves";
 import type { PieceKind } from "@/lib/pieces";
-import { grooveCentrelines } from "@/lib/pieces";
+import { grooveCentrelines, isSloped } from "@/lib/pieces";
 import { GROOVE_DEPTH } from "@/lib/space";
 
 /**
@@ -12,6 +12,10 @@ import { GROOVE_DEPTH } from "@/lib/space";
  * The sides follow the top surface, so grooves show as notches where they
  * reach the edge. Pieces are built unrotated; the mesh is rotated to place
  * them. Three.js uses y up, so world (x, y, z) is built as (x, z, y).
+ *
+ * A ramp's top slopes down a level across it, so its low end meets the
+ * track below. Its base hangs a little below its cell, so there's still
+ * wood under the groove at that end.
  */
 
 export interface PieceGeometry {
@@ -25,6 +29,8 @@ export interface PieceGeometry {
 const RESOLUTION = 48;
 /** How much darker the wood is at the bottom of a groove */
 const GROOVE_SHADE = 0.3;
+/** Height of the bottom of a ramp, below its centre */
+const RAMP_BASE = -0.75;
 
 const cache = new Map<PieceKind, PieceGeometry>();
 
@@ -41,11 +47,18 @@ function buildPiece(kind: PieceKind): PieceGeometry {
   const lines = grooveCentrelines(kind, 0);
   const n = lines.length === 0 ? 1 : RESOLUTION;
   const coord = (i: number) => -0.5 + i / n;
+  const base = isSloped(kind) ? RAMP_BASE : -0.5;
+  const drop = (x: number, z: number) => slopeDrop(kind, 0, { x, y: z });
 
+  // How deep the grooves are carved, and the height of the top once a
+  // ramp's slope is taken off
+  const carved: number[] = [];
   const heights: number[] = [];
   for (let j = 0; j <= n; j++) {
     for (let i = 0; i <= n; i++) {
-      heights.push(surfaceHeight(lines, { x: coord(i), y: coord(j) }));
+      const height = surfaceHeight(lines, { x: coord(i), y: coord(j) });
+      carved.push(height);
+      heights.push(height - drop(coord(i), coord(j)));
     }
   }
   const h = (i: number, j: number) =>
@@ -62,7 +75,7 @@ function buildPiece(kind: PieceKind): PieceGeometry {
       const slopeX = ((h(i + 1, j) - h(i - 1, j)) * n) / 2;
       const slopeY = ((h(i, j + 1) - h(i, j - 1)) * n) / 2;
       const normal = new THREE.Vector3(-slopeX, 1, -slopeY).normalize();
-      const depth = (0.5 - h(i, j)) / GROOVE_DEPTH;
+      const depth = (0.5 - carved[j * (n + 1) + i]) / GROOVE_DEPTH;
       top.push(
         builder.vertex(
           [coord(i), h(i, j), coord(j)],
@@ -99,8 +112,8 @@ function buildPiece(kind: PieceKind): PieceGeometry {
       const height = h(i, j);
       const along = k / n;
       return {
-        bottom: builder.vertex([x, -0.5, z], outward, [along, 0], 1),
-        top: builder.vertex([x, height, z], outward, [along, height + 0.5], 1),
+        bottom: builder.vertex([x, base, z], outward, [along, 0], 1),
+        top: builder.vertex([x, height, z], outward, [along, height - base], 1),
         position: [x, height, z],
       };
     });
@@ -119,10 +132,10 @@ function buildPiece(kind: PieceKind): PieceGeometry {
   // Bottom
   const down: [number, number, number] = [0, -1, 0];
   builder.quad(
-    builder.vertex([-0.5, -0.5, -0.5], down, [0, 0], 1),
-    builder.vertex([0.5, -0.5, -0.5], down, [1, 0], 1),
-    builder.vertex([0.5, -0.5, 0.5], down, [1, 1], 1),
-    builder.vertex([-0.5, -0.5, 0.5], down, [0, 1], 1),
+    builder.vertex([-0.5, base, -0.5], down, [0, 0], 1),
+    builder.vertex([0.5, base, -0.5], down, [1, 0], 1),
+    builder.vertex([0.5, base, 0.5], down, [1, 1], 1),
+    builder.vertex([-0.5, base, 0.5], down, [0, 1], 1),
     down,
   );
 
@@ -133,15 +146,15 @@ function buildPiece(kind: PieceKind): PieceGeometry {
     [0.5, 0.5],
     [-0.5, 0.5],
   ]) {
-    outline.push(x, -0.5, z, x, 0.5, z);
+    outline.push(x, base, z, x, 0.5 - drop(x, z), z);
   }
   outline.push(
-    ...[-0.5, -0.5, -0.5, 0.5, -0.5, -0.5],
-    ...[0.5, -0.5, -0.5, 0.5, -0.5, 0.5],
-    ...[0.5, -0.5, 0.5, -0.5, -0.5, 0.5],
-    ...[-0.5, -0.5, 0.5, -0.5, -0.5, -0.5],
+    ...[-0.5, base, -0.5, 0.5, base, -0.5],
+    ...[0.5, base, -0.5, 0.5, base, 0.5],
+    ...[0.5, base, 0.5, -0.5, base, 0.5],
+    ...[-0.5, base, 0.5, -0.5, base, -0.5],
   );
-  outline.push(...grooveRims(heights, n));
+  outline.push(...grooveRims(carved, n, drop));
 
   const outlineGeometry = new THREE.BufferGeometry();
   outlineGeometry.setAttribute(
@@ -158,9 +171,13 @@ function range(n: number): number[] {
 
 /**
  * Line segments tracing where the grooves meet the flat top, found with
- * marching squares over the height samples
+ * marching squares over the carved depths, then dropped down any slope
  */
-function grooveRims(heights: number[], n: number): number[] {
+function grooveRims(
+  heights: number[],
+  n: number,
+  drop: (x: number, z: number) => number,
+): number[] {
   const level = 0.5 - 0.004;
   const lift = 0.003;
   const segments: number[] = [];
@@ -184,11 +201,9 @@ function grooveRims(heights: number[], n: number): number[] {
         const b = value(bi, bj);
         if (a < level !== b < level) {
           const t = (level - a) / (b - a);
-          crossings.push([
-            coord(ai + (bi - ai) * t),
-            level + lift,
-            coord(aj + (bj - aj) * t),
-          ]);
+          const x = coord(ai + (bi - ai) * t);
+          const z = coord(aj + (bj - aj) * t);
+          crossings.push([x, level + lift - drop(x, z), z]);
         }
       }
       for (let c = 0; c + 1 < crossings.length; c += 2) {

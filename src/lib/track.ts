@@ -149,8 +149,9 @@ export class TrackIndex {
           ) {
             continue;
           }
-          // An upside-down piece's openings are a level down
-          const level = z + portLevel(piece);
+          // An upside-down piece's openings are a level down, and so is
+          // the low end of a ramp
+          const level = z + portLevel(piece, side);
           const key = portKey(x + v.x / 2 - level, y + v.y / 2 - level, side);
           addTo(this.ports, key, piece);
         }
@@ -258,10 +259,17 @@ export class TrackIndex {
    * the one closest to the camera (the one you can see) wins.
    */
   findConnection(piece: Piece, direction: Direction): Piece | undefined {
-    return this.findConnectionFrom(portCell(piece), direction, piece);
+    return this.findConnectionFrom(
+      portCell(piece, direction),
+      direction,
+      piece,
+    );
   }
 
-  /** As findConnection, for a piece that would sit at `cell` */
+  /**
+   * As findConnection, for a piece whose opening heading `direction` would
+   * belong to `cell` (see portCell)
+   */
   findConnectionFrom(
     cell: Cell,
     direction: Direction,
@@ -277,7 +285,12 @@ export class TrackIndex {
     return frontmost(
       (this.ports.get(key) ?? []).filter(
         (other) =>
-          other !== exclude && looksJoined(cell, portCell(other), direction),
+          other !== exclude &&
+          looksJoined(
+            cell,
+            portCell(other, oppositeDirection(direction)),
+            direction,
+          ),
       ),
     );
   }
@@ -291,11 +304,12 @@ export class TrackIndex {
   }
 }
 
-/** The cell a piece's side openings belong to */
+/** The cell a piece's opening on `side` belongs to */
 export function portCell(
   piece: Pick<Piece, "kind" | "rotation" | "cell">,
+  side: Direction,
 ): Cell {
-  return { ...piece.cell, z: piece.cell.z + portLevel(piece) };
+  return { ...piece.cell, z: piece.cell.z + portLevel(piece, side) };
 }
 
 /**

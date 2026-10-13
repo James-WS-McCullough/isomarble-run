@@ -4,7 +4,7 @@ import {
   oppositeDirection,
   rotateDirection,
 } from "../directions";
-import { isUpsideDown, type PieceKind, piecePorts } from "../pieces";
+import { downhill, isUpsideDown, type PieceKind, piecePorts } from "../pieces";
 import type { Vec3 } from "../space";
 import { type Piece, restHeight, type TrackIndex } from "../track";
 import { fallIntoHole } from "./holes";
@@ -16,10 +16,12 @@ import {
   type SimulationEvent,
   snapTo,
 } from "./marble";
-import { densify, pathOnPiece } from "./routes";
+import { PHYSICS } from "./physics";
+import { densify, pathOnPiece, settle } from "./routes";
 import type { Seesaws } from "./seesaws";
 import { pushesFlipFlop, type Switches } from "./switches";
 import { blowUp, enterTube } from "./tubes";
+import { scale } from "./vector";
 import { enterVortex } from "./vortex";
 
 /** What a piece's behaviour can reach */
@@ -99,6 +101,41 @@ const intoTheTop: PieceBehaviour["land"] = (
 };
 
 export const BEHAVIOURS: Partial<Record<PieceKind, PieceBehaviour>> = {
+  ramp: {
+    // Coming down on a ramp: it keeps the part of its speed along the
+    // slope, and rolls whichever way that takes it
+    land(_world, marble, landing, events) {
+      const { piece, point } = landing;
+      const down = downhill(piece.rotation);
+      const d = DIRECTION_VECTORS[down];
+      const v = marble.velocity;
+      const across = v.x * d.x + v.y * d.y;
+      const along = (across - v.z) * Math.SQRT1_2;
+      const impact = Math.abs(across + v.z) * Math.SQRT1_2;
+      settle(marble, piece, point, along >= 0 ? down : oppositeDirection(down));
+      marble.speed = Math.min(PHYSICS.MAX_SPEED, Math.abs(along));
+      events.push({ type: "land", marbleId: marble.id, impact });
+      events.push({ type: "visit", pieceId: piece.id, marbleId: marble.id });
+    },
+    // Rolling over the top of a ramp fast: off the lip and into the air
+    rollIn(_world, marble, piece, arriving) {
+      if (arriving !== downhill(piece.rotation)) return false;
+      if (marble.speed <= PHYSICS.LIP_JUMP_SPEED) return false;
+      carryOn(marble, arriving);
+      return true;
+    },
+    // Off either end with no track to roll on to, or fast over the top:
+    // into the air the way the slope sends it
+    leave(world, marble, rolling) {
+      const { path, piece, exit } = rolling;
+      const heading = path.tangentAt(path.length);
+      const skiJump = heading.z > 0 && marble.speed > PHYSICS.SKI_JUMP_SPEED;
+      if (!skiJump && world.track.findConnection(piece, exit)) return false;
+      takeOff(marble, scale(heading, marble.speed), exit);
+      return true;
+    },
+  },
+
   // Landing on a vortex, or rolling in over its rim: round and round it goes
   vortex: {
     land(_world, marble, landing, events) {
@@ -270,12 +307,22 @@ export const BEHAVIOURS: Partial<Record<PieceKind, PieceBehaviour>> = {
 /** Keep going the way it was rolling, now in the air */
 function carryOn(marble: Marble, arriving: Direction) {
   const heading = DIRECTION_VECTORS[arriving];
+  takeOff(
+    marble,
+    { x: heading.x * marble.speed, y: heading.y * marble.speed, z: 0 },
+    arriving,
+  );
+}
+
+/**
+ * Fly off with a velocity. Heading towards the camera, it can land on
+ * anything that looks below it; heading away, it drops behind pieces that
+ * are in front of it.
+ */
+export function takeOff(marble: Marble, velocity: Vec3, heading: Direction) {
   marble.motion = FLYING;
-  marble.velocity = {
-    x: heading.x * marble.speed,
-    y: heading.y * marble.speed,
-    z: 0,
-  };
+  marble.velocity = velocity;
+  marble.headingForward = heading === "+x" || heading === "+y";
 }
 
 /** Where a marble rolling onto a piece comes in, level with the track */
