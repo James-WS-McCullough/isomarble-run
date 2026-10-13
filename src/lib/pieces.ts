@@ -25,7 +25,9 @@ export type PieceKind =
   | "outlet"
   | "funnel"
   | "fan"
-  | "seesaw";
+  | "seesaw"
+  | "dispenser"
+  | "hole";
 
 interface PieceDefinition {
   kind: PieceKind;
@@ -70,6 +72,9 @@ const ANY_WAY = (arriving: Direction | null) => (arriving ? [arriving] : ALL);
 
 /** The well in the middle of a fan's crossroads that the fan sits in */
 export const FAN_WELL = { RADIUS: 0.3, DEPTH: 0.3 };
+
+/** The hole marbles vanish into */
+export const HOLE = { RADIUS: 0.27, DEPTH: 0.46 };
 
 /** Radius of the round dip in the middle of a catcher */
 export const CATCHER_BOWL_RADIUS = 0.42;
@@ -196,6 +201,28 @@ const PIECE_DEFINITIONS: PieceDefinition[] = [
     grooves: [],
     open: true,
     length: 3,
+  },
+  {
+    // A hopper full of marbles that lets one roll out of its side every
+    // couple of seconds
+    kind: "dispenser",
+    label: "Dispenser",
+    ports: ["+x"],
+    exits: () => ["+x"],
+    grooves: [fromCentre("+x")],
+  },
+  {
+    // A crossroads with a deep hole in the middle: marbles that roll or drop
+    // onto it fall in and are gone
+    kind: "hole",
+    label: "Hole",
+    ports: ALL,
+    exits: ANY_WAY,
+    grooves: [
+      across("+x", "-x"),
+      across("+y", "-y"),
+      { type: "well", radius: HOLE.RADIUS, depth: HOLE.DEPTH },
+    ],
   },
 ];
 

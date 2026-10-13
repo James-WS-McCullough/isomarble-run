@@ -166,14 +166,19 @@ export default function Home() {
     if (events.length === 0) return;
 
     const removed = new Set<string>();
+    const added: string[] = [];
     for (const event of events) {
       if (event.type === "removed") removed.add(event.marbleId);
+      else if (event.type === "added") added.push(event.marbleId);
       else if (event.type === "land" || event.type === "hit") {
         sound.tap(event.impact);
       }
     }
-    if (removed.size > 0) {
-      setMarbleIds((ids) => ids.filter((id) => !removed.has(id)));
+    if (removed.size > 0 || added.length > 0) {
+      setMarbleIds((ids) => [
+        ...ids.filter((id) => !removed.has(id)),
+        ...added.filter((id) => !removed.has(id)),
+      ]);
     }
   };
 

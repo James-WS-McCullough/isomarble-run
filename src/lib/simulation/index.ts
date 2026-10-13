@@ -18,6 +18,8 @@ import {
 import { type Piece, restHeight, TrackIndex } from "../track";
 import { BEHAVIOURS, type World } from "./behaviours";
 import { collideMarbles } from "./collisions";
+import { Dispensers } from "./dispensers";
+import { stepVanishing } from "./holes";
 import { findLanding } from "./landing";
 import {
   FLYING,
@@ -79,6 +81,7 @@ export class Simulation {
   private leftoverTime = 0;
   private readonly random: () => number;
   private readonly seesaws: Seesaws;
+  private readonly dispensers = new Dispensers();
 
   constructor(random: () => number = Math.random) {
     this.random = random;
@@ -97,6 +100,7 @@ export class Simulation {
 
     const byId = new Map(pieces.map((piece) => [piece.id, piece]));
     this.seesaws.keepOnly(byId);
+    this.dispensers.keepOnly(pieces);
     for (const marble of this.marbles) {
       const { motion } = marble;
       if (motion.mode === "rolling" || motion.mode === "held") {
@@ -123,6 +127,11 @@ export class Simulation {
    */
   addMarble(pointOnScreen: Vec3): Marble {
     const { right, up } = screenOf(pointOnScreen);
+    return this.createMarble(fromScreen(right, up, this.bounds.frontDepth));
+  }
+
+  /** A new marble at a point, in its own colour and design */
+  private createMarble(position: Vec3): Marble {
     marbleCounter += 1;
     const marble: Marble = {
       id: `marble-${marbleCounter}`,
@@ -131,7 +140,7 @@ export class Simulation {
         hue: (marbleCounter * GOLDEN_ANGLE) % 360,
         pattern: pick([...MARBLE_PATTERNS], this.random),
       },
-      position: fromScreen(right, up, this.bounds.frontDepth),
+      position,
       motion: FLYING,
       velocity: { x: 0, y: 0, z: 0 },
       speed: 0,
@@ -177,7 +186,11 @@ export class Simulation {
         if (landing) this.land(marble, landing, events);
       } else if (motion.mode === "held") {
         this.seesaws.stepHeld(marble, motion);
-      } else if (!this.stepFlying(marble, dt, events)) {
+      } else if (
+        motion.mode === "vanishing"
+          ? !stepVanishing(marble, motion, dt)
+          : !this.stepFlying(marble, dt, events)
+      ) {
         events.push({ type: "removed", marbleId: marble.id });
         continue;
       }
@@ -188,6 +201,35 @@ export class Simulation {
     this.marbles = kept;
     collideMarbles(this.marbles, this.track, this.random, events);
     this.seesaws.step(dt, this.marbles);
+
+    for (const id of this.dispensers.step(dt, this.marbles.length)) {
+      const dispenser = this.track.pieces.find((piece) => piece.id === id);
+      if (dispenser) this.dispense(dispenser, events);
+    }
+  }
+
+  /** Let a new marble out of a dispenser, rolling out of its side */
+  private dispense(dispenser: Piece, events: SimulationEvent[]) {
+    const exit = piecePorts(dispenser.kind, dispenser.rotation)[0];
+    const v = DIRECTION_VECTORS[exit];
+    const path = pathOnPiece(
+      dispenser,
+      densify([
+        { x: 0, y: 0 },
+        { x: v.x / 2, y: v.y / 2 },
+      ]),
+    );
+    const marble = this.createMarble(path.points[0]);
+    marble.speed = PHYSICS.CRUISE_SPEED;
+    marble.motion = {
+      mode: "rolling",
+      piece: dispenser,
+      path,
+      distance: 0,
+      exit,
+      entry: null,
+    };
+    events.push({ type: "added", marbleId: marble.id });
   }
 
   private stepRolling(marble: Marble, dt: number, events: SimulationEvent[]) {

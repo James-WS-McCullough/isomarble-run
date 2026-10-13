@@ -70,6 +70,7 @@ function velocityOf(marble: Marble): Vec3 {
     case "tube":
       return { x: 0, y: 0, z: marble.velocity.z };
     case "held":
+    case "vanishing":
       return { x: 0, y: 0, z: 0 };
   }
 }
@@ -99,7 +100,8 @@ function setVelocity(marble: Marble, velocity: Vec3, random: () => number) {
       marble.velocity = { x: 0, y: 0, z: velocity.z };
       return;
     case "held":
-      // A marble sitting in a seesaw cup stays put
+    case "vanishing":
+      // A marble sitting in a seesaw cup, or dropping into a hole, stays put
       return;
   }
 }

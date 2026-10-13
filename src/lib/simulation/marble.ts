@@ -8,7 +8,7 @@ import { add, subtract } from "./vector";
  * What a marble is doing. It's always exactly one of these, and each carries
  * what that kind of movement needs.
  */
-export type Motion = Flying | Rolling | InTube | Held;
+export type Motion = Flying | Rolling | InTube | Held | Vanishing;
 
 /** Flying through the air, moving with its velocity */
 export interface Flying {
@@ -49,6 +49,16 @@ export interface Held {
   piece: Piece;
   /** Which end of the seesaw (±1) */
   side: number;
+}
+
+/** Dropping into a hole, never to be seen again */
+export interface Vanishing {
+  mode: "vanishing";
+  /** The middle of the hole */
+  x: number;
+  y: number;
+  /** Once it's below this, it's gone */
+  bottom: number;
 }
 
 export const FLYING: Flying = { mode: "flying" };
@@ -97,7 +107,10 @@ export type SimulationEvent =
   /** A marble arrived on a piece, rolling or dropping in */
   | { type: "visit"; pieceId: string; marbleId: string }
   | { type: "hit"; impact: number }
-  | { type: "removed"; marbleId: string };
+  /** A marble that left the board, or fell into a hole */
+  | { type: "removed"; marbleId: string }
+  /** A new marble, let out by a dispenser */
+  | { type: "added"; marbleId: string };
 
 /** Where a falling marble comes down on a piece */
 export interface Landing {

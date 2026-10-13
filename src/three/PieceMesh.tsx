@@ -3,6 +3,7 @@
 import type { ComponentType } from "react";
 import type { PieceKind } from "@/lib/pieces";
 import { type Cell, toThree } from "@/lib/space";
+import { Dispenser } from "./DispenserMesh";
 import { Fan } from "./FanMesh";
 import {
   getPieceMaterial,
@@ -44,6 +45,7 @@ const MODELS: Partial<Record<PieceKind, ComponentType<ModelProps>>> = {
   funnel: GlassFunnel,
   fan: Fan,
   seesaw: Seesaw,
+  dispenser: Dispenser,
 };
 
 const ignoreRaycast = () => null;

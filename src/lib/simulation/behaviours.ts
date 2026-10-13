@@ -6,6 +6,7 @@ import {
 import { isUpsideDown, type PieceKind, piecePorts } from "../pieces";
 import type { Vec3 } from "../space";
 import { type Piece, restHeight, type TrackIndex } from "../track";
+import { fallIntoHole } from "./holes";
 import {
   FLYING,
   type Landing,
@@ -71,6 +72,19 @@ const intoTheTop: PieceBehaviour["land"] = (
 };
 
 export const BEHAVIOURS: Partial<Record<PieceKind, PieceBehaviour>> = {
+  // Rolling or dropping onto a hole: in it goes, never to be seen again
+  hole: {
+    land(_world, marble, landing, events) {
+      const impact = Math.abs(marble.velocity.z) / 2;
+      events.push({ type: "land", marbleId: marble.id, impact });
+      fallIntoHole(marble, landing.piece, landing.point, events);
+    },
+    rollIn(_world, marble, piece, arriving, events) {
+      fallIntoHole(marble, piece, entryPoint(piece, arriving), events);
+      return true;
+    },
+  },
+
   seesaw: {
     land(world, marble, landing, events) {
       marble.position = landing.point;

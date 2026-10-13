@@ -32,6 +32,7 @@ const ICONS: Partial<Record<PieceKind, (props: IconProps) => JSX.Element>> = {
 /** Extra details drawn over a piece's top face */
 const DETAILS: Partial<Record<PieceKind, () => JSX.Element>> = {
   fan: FanDetails,
+  dispenser: DispenserDetails,
 };
 
 /**
@@ -102,6 +103,18 @@ function Groove({ points }: { points: Point[] }) {
       stroke={GROOVE}
       strokeWidth="6"
     />
+  );
+}
+
+/** The dispenser's hopper of marbles, seen from above */
+function DispenserDetails() {
+  return (
+    <>
+      <polygon points={circle(0.3, -0.12)} {...GLASS} />
+      <circle cx="16" cy="18" r="2.6" fill="#e0533d" />
+      <circle cx="20" cy="16" r="2.6" fill={MARBLE} />
+      <circle cx="18.5" cy="21" r="2.6" fill="#f2c94c" />
+    </>
   );
 }
 
@@ -199,11 +212,11 @@ function project(x: number, y: number): string {
   return `${(SIZE / 2 + right).toFixed(2)},${(SIZE / 2 + down).toFixed(2)}`;
 }
 
-/** An isometric circle of radius r on the top face */
-function circle(r: number): string {
+/** An isometric circle of radius r on the top face, centred at (x, 0) */
+function circle(r: number, x = 0): string {
   return Array.from({ length: 24 }, (_, i) => {
     const angle = (i / 24) * Math.PI * 2;
-    return project(r * Math.cos(angle), r * Math.sin(angle));
+    return project(x + r * Math.cos(angle), r * Math.sin(angle));
   }).join(" ");
 }
 
