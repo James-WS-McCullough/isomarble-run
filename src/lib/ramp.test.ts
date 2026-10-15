@@ -110,31 +110,65 @@ describe("ramps", () => {
     ]);
   });
 
-  it("flies a fast marble off the top of a ramp", () => {
-    // Down two ramps in a row: fast from the first, it sails right over
-    // the second
+  it("flies a fast marble off level track over the top of a ramp", () => {
+    // Fast from the first ramp, along a level track and over the lip of
+    // the next: it sails right over it
     const layout: Layout = [
       ["dispenser", 0, -1, 0, 2],
       ["ramp", 0, 0, 0, 2],
-      ["ramp", 0, 1, 0, 1],
-      ["straight", 0, 2, 0, 0],
+      ["straight", 0, 1, 0, 1],
+      ["ramp", 0, 2, 0, 1],
       ["straight", 0, 3, 0, 0],
+      ["straight", 0, 4, 0, 0],
+      ["straight", 0, 5, 0, 0],
     ];
     const { pieces, sim, events, marble } = start(layout);
     let flewOverRamp = false;
-    for (let i = 0; i < 60; i++) {
+    for (let i = 0; i < 90; i++) {
       events.push(...sim.advance(1 / 60));
       const { x } = marble.position;
-      if (x > 0.7 && x < 1.5)
+      if (x > 1.7 && x < 2.5) {
         flewOverRamp ||= motionAs(marble, "flying") !== null;
+      }
     }
     expect(flewOverRamp).toBe(true);
-    expect(visited(events, pieces)).toEqual([
-      "ramp@0,0,2",
-      "straight@2,0,0",
-      "straight@3,0,0",
-    ]);
+    expect(visited(events, pieces)).not.toContain("ramp@2,0,1");
+    expect(visited(events, pieces)).toContain("straight@4,0,0");
   });
+
+  // Two ramps in a row make one long slope, wherever the second is along
+  // the line of sight, as long as it looks joined on
+  for (const depth of [-1, 0, 1]) {
+    it(`rolls down two ramps in a row as one slope (${depth} closer)`, () => {
+      const second = { x: 1 + depth, y: depth, z: 1 + depth };
+      const layout: Layout = [
+        ["dispenser", 0, -1, 0, 2],
+        ["ramp", 0, 0, 0, 2],
+        ["ramp", 0, second.x, second.y, second.z],
+        ["straight", 0, second.x + 1, second.y, second.z - 1],
+        ["straight", 0, second.x + 2, second.y, second.z - 1],
+      ];
+      const { pieces, sim, events, marble } = start(layout);
+      // Never in the air on the way down
+      let flew = false;
+      let speed = 0;
+      for (let i = 0; i < 60; i++) {
+        events.push(...sim.advance(1 / 60));
+        if (marble.position.x < second.x + 1.5) {
+          flew ||= motionAs(marble, "flying") !== null;
+          speed = marble.speed;
+        }
+      }
+      expect(flew).toBe(false);
+      expect(visited(events, pieces)).toEqual(
+        pieces
+          .slice(1)
+          .map(({ kind, cell }) => `${kind}@${cell.x},${cell.y},${cell.z}`),
+      );
+      // Faster than off one ramp
+      expect(speed).toBeGreaterThan(7);
+    });
+  }
 
   it("launches a fast marble off the top of a ramp up, like a ski jump", () => {
     const layout: Layout = [

@@ -4,7 +4,13 @@ import {
   oppositeDirection,
   rotateDirection,
 } from "../directions";
-import { downhill, isUpsideDown, type PieceKind, piecePorts } from "../pieces";
+import {
+  downhill,
+  isSloped,
+  isUpsideDown,
+  type PieceKind,
+  piecePorts,
+} from "../pieces";
 import type { Vec3 } from "../space";
 import { type Piece, restHeight, type TrackIndex } from "../track";
 import { fallIntoHole } from "./holes";
@@ -12,6 +18,7 @@ import {
   FLYING,
   type Landing,
   type Marble,
+  motionAs,
   type Rolling,
   type SimulationEvent,
   snapTo,
@@ -117,20 +124,32 @@ export const BEHAVIOURS: Partial<Record<PieceKind, PieceBehaviour>> = {
       events.push({ type: "land", marbleId: marble.id, impact });
       events.push({ type: "visit", pieceId: piece.id, marbleId: marble.id });
     },
-    // Rolling over the top of a ramp fast: off the lip and into the air
+    // Rolling fast off level track over the top of a ramp: off the lip and
+    // into the air. Coming down another ramp, the slope just carries on.
     rollIn(_world, marble, piece, arriving) {
       if (arriving !== downhill(piece.rotation)) return false;
       if (marble.speed <= PHYSICS.LIP_JUMP_SPEED) return false;
+      const before = motionAs(marble, "rolling");
+      const level =
+        !before || isLevel(before.path.tangentAt(before.path.length));
+      if (!level) return false;
       carryOn(marble, arriving);
       return true;
     },
-    // Off either end with no track to roll on to, or fast over the top:
-    // into the air the way the slope sends it
+    // Off either end with no track to roll on to, or fast over the top onto
+    // level track: into the air the way the slope sends it
     leave(world, marble, rolling) {
       const { path, piece, exit } = rolling;
       const heading = path.tangentAt(path.length);
-      const skiJump = heading.z > 0 && marble.speed > PHYSICS.SKI_JUMP_SPEED;
-      if (!skiJump && world.track.findConnection(piece, exit)) return false;
+      const next = world.track.findConnection(piece, exit);
+      // Up onto another ramp, the slope just carries on
+      const climbing =
+        next !== undefined &&
+        isSloped(next.kind) &&
+        downhill(next.rotation) === oppositeDirection(exit);
+      const skiJump =
+        heading.z > 0 && marble.speed > PHYSICS.SKI_JUMP_SPEED && !climbing;
+      if (next && !skiJump) return false;
       takeOff(marble, scale(heading, marble.speed), exit);
       return true;
     },
@@ -303,6 +322,11 @@ export const BEHAVIOURS: Partial<Record<PieceKind, PieceBehaviour>> = {
     },
   },
 };
+
+/** Whether a direction of travel along a track is about level */
+function isLevel(heading: Vec3): boolean {
+  return Math.abs(heading.z) < 0.3;
+}
 
 /** Keep going the way it was rolling, now in the air */
 function carryOn(marble: Marble, arriving: Direction) {

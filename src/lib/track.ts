@@ -6,7 +6,9 @@ import {
   rotateDirection,
 } from "./directions";
 import {
+  downhill,
   isFlatTopped,
+  isSloped,
   isSolid,
   isTube,
   isUpsideDown,
@@ -259,22 +261,16 @@ export class TrackIndex {
    * the one closest to the camera (the one you can see) wins.
    */
   findConnection(piece: Piece, direction: Direction): Piece | undefined {
-    return this.findConnectionFrom(
-      portCell(piece, direction),
-      direction,
-      piece,
-    );
+    return this.findConnectionFrom(piece, direction, piece);
   }
 
-  /**
-   * As findConnection, for a piece whose opening heading `direction` would
-   * belong to `cell` (see portCell)
-   */
+  /** As findConnection, for a piece that might not be on the track */
   findConnectionFrom(
-    cell: Cell,
+    from: Placement,
     direction: Direction,
     exclude?: Piece,
   ): Piece | undefined {
+    const cell = portCell(from, direction);
     const { x, y, z } = cell;
     const v = DIRECTION_VECTORS[direction];
     const key = portKey(
@@ -287,9 +283,8 @@ export class TrackIndex {
         (other) =>
           other !== exclude &&
           looksJoined(
-            cell,
-            portCell(other, oppositeDirection(direction)),
-            direction,
+            { piece: from, side: direction },
+            { piece: other, side: oppositeDirection(direction) },
           ),
       ),
     );
@@ -304,30 +299,45 @@ export class TrackIndex {
   }
 }
 
+/** Where a piece is, or would be, placed */
+type Placement = Pick<Piece, "kind" | "rotation" | "cell">;
+
 /** The cell a piece's opening on `side` belongs to */
-export function portCell(
-  piece: Pick<Piece, "kind" | "rotation" | "cell">,
-  side: Direction,
-): Cell {
+export function portCell(piece: Placement, side: Direction): Cell {
   return { ...piece.cell, z: piece.cell.z + portLevel(piece, side) };
 }
 
+/** One side of a piece where it meets another */
+interface Opening {
+  piece: Placement;
+  side: Direction;
+}
+
 /**
- * Whether two pieces whose openings line up on screen really look joined.
+ * Whether two pieces whose openings line up on screen really look joined,
+ * a marble heading out of `from` into `next`.
  *
  * `next` sits k steps along the line of sight from the true neighbouring
  * cell (k > 0 is closer to the camera). Where the pieces meet, the one
  * further down the screen must not be further away: otherwise the front
  * wall of the upper piece hangs down over the join and it looks like a step.
  * Heading down the screen (+x, +y) that means k >= 0; heading up it, k <= 0.
+ *
+ * The low end of a ramp has next to no wall to hang over the join, so with
+ * one of those on the upper piece, they look joined at any depth.
  */
-export function looksJoined(
-  from: Cell,
-  next: Cell,
-  direction: Direction,
-): boolean {
-  const k = next.z - from.z;
-  return direction === "+x" || direction === "+y" ? k >= 0 : k <= 0;
+export function looksJoined(from: Opening, next: Opening): boolean {
+  const downScreen = from.side === "+x" || from.side === "+y";
+  const upper = downScreen ? from : next;
+  if (isLowEnd(upper)) return true;
+  const k =
+    portCell(next.piece, next.side).z - portCell(from.piece, from.side).z;
+  return downScreen ? k >= 0 : k <= 0;
+}
+
+/** Whether an opening is at the low end of a ramp */
+function isLowEnd({ piece, side }: Opening): boolean {
+  return isSloped(piece.kind) && side === downhill(piece.rotation);
 }
 
 function portKey(a: number, b: number, side: Direction): string {
